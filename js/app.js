@@ -12,7 +12,7 @@ const FIRST_MONDAY = "2026-09-21";
 const LAST_MONDAY = "2026-10-26";
 // Deadline call-outs shown under the week selector, keyed by ISO week number.
 const WEEK_NOTES = {
-  42: { cls: "week-deadline", text: "HW2 submission deadline: 14th October." },
+  42: { cls: "week-deadline", text: "HW2 submission deadline: 14th October, 21:00." },
   43: { cls: "week-postdeadline", text: "Post-deadline. Extension is ok if no free options were left in prior weeks." },
   44: { cls: "week-postdeadline", text: "Post-deadline. Extension is ok if no free options were left in prior weeks." },
 };
