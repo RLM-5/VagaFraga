@@ -1,5 +1,5 @@
 import {
-  db, auth, authReady, doc, getDoc, setDoc, runTransaction,
+  db, auth, authReady, doc, getDoc, getDocs, setDoc, runTransaction,
   collection, query, where, onSnapshot, serverTimestamp
 } from "./firebase-init.js";
 
@@ -66,6 +66,11 @@ let weekSessionsByTab = { 1: new Map(), 2: new Map(), 3: new Map(), 4: new Map()
 let unsubByTab = { 1: null, 2: null, 3: null, 4: null };
 let subscribedWeekByTab = { 1: null, 2: null, 3: null, 4: null };
 let counters = { curiousCount: 0, interviewerCount: 0 };
+// Counts scoped to the student's currently-ticked courses, refetched
+// whenever the course selection changes — separate from the global
+// `counters` above, which stay global for the tab-1 balance rule.
+let courseScopedCounts = { curious: 0, interviewer: 0 };
+let historyStack = []; // stack of {draftActive, draftObservations} snapshots, for Undo
 
 /* ---------------- boot ---------------- */
 // Course/schedule data is the static JSON plus whatever students have
@@ -99,6 +104,8 @@ async function boot() {
   wireTabs();
   wireApprove();
   wireAddCourse();
+  wireUndo();
+  wireExplainButtons();
 
   authReady.then(u => { myUid = u.uid; });
 
@@ -163,6 +170,7 @@ function toggleCourse(code) {
   if (selectedCourses.has(code)) selectedCourses.delete(code); else selectedCourses.add(code);
   pruneDraftToSelectedCourses();
   renderCourseLists();
+  refreshCourseScopedCounts();
   if (nameConfirmed) { renderTab(activeTab); renderSummary(); }
 }
 function wireCoursePicker() {
@@ -172,8 +180,31 @@ function wireCoursePicker() {
     selectedCourses = allSelected ? new Set() : new Set(COURSES.map(c => c.code));
     pruneDraftToSelectedCourses();
     renderCourseLists();
+    refreshCourseScopedCounts();
     if (nameConfirmed) { renderTab(activeTab); renderSummary(); }
   });
+}
+
+// Live counts of curious/interviewer registrations, scoped to only the
+// courses the student has ticked — used for the tab 2/3/4 "not enough
+// people registered yet" notice, which should reflect what's relevant
+// to this student rather than the whole class (that's what the global
+// `counters` / tab-1 balance rule are for).
+async function refreshCourseScopedCounts() {
+  if (selectedCourses.size === 0) {
+    courseScopedCounts = { curious: 0, interviewer: 0 };
+  } else {
+    try {
+      const courses = [...selectedCourses].slice(0, 30); // Firestore 'in' query cap
+      const snap = await getDocs(query(collection(db, "sessions"), where("course", "in", courses)));
+      let curious = 0, interviewer = 0;
+      snap.forEach(d => { const data = d.data(); if (data.curious) curious++; if (data.interviewer) interviewer++; });
+      courseScopedCounts = { curious, interviewer };
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  if (nameConfirmed && [2, 3, 4].includes(activeTab)) renderTab(activeTab);
 }
 wireCoursePicker();
 
@@ -273,6 +304,7 @@ async function submitAddCourse() {
       setDoc(doc(db, "customSchedule", `${code}_${p.date}_${p.slot}`), { course: code, date: p.date, slot: p.slot, type: p.type })
     ));
     selectedCourses.add(code);
+    refreshCourseScopedCounts();
     closeAddCourseModal();
     toast("Course added — don't forget to go to the tabs below and select your own role for it.");
   } catch (err) {
@@ -300,6 +332,7 @@ function wireHeader() {
   });
 }
 function hideBanners() {
+  document.getElementById("identityModal").classList.add("hidden");
   document.getElementById("duplicateBanner").classList.add("hidden");
   document.getElementById("confirmBanner").classList.add("hidden");
 }
@@ -329,6 +362,8 @@ function roleSummaryText(data) {
   return parts.length ? parts.join(", and as ") : "no roles recorded yet";
 }
 function showDuplicateBanner(existingData) {
+  document.getElementById("identityModal").classList.remove("hidden");
+  document.getElementById("confirmBanner").classList.add("hidden");
   const banner = document.getElementById("duplicateBanner");
   banner.classList.remove("hidden");
   banner.innerHTML = `
@@ -364,11 +399,13 @@ async function confirmFreshStart() {
   origState = { active: null, observations: [], createdAt: null };
   draftActive = null;
   draftObservations = [];
+  historyStack = [];
   document.getElementById("mainApp").classList.remove("hidden");
   document.getElementById("lockedNotice").classList.add("hidden");
   activeLocked = false;
   renderSummary();
   renderTab(activeTab);
+  updateUndoButtons();
 }
 async function confirmReturning(existingData) {
   hideBanners();
@@ -381,15 +418,18 @@ async function confirmReturning(existingData) {
   };
   draftActive = origState.active;
   draftObservations = [...origState.observations];
+  historyStack = [];
   selectedCourses = new Set([
     ...(origState.active ? [origState.active.course] : []),
     ...origState.observations.map(o => o.course)
   ]);
   renderCourseLists();
+  refreshCourseScopedCounts();
   await refreshActiveLock();
   document.getElementById("mainApp").classList.remove("hidden");
   renderSummary();
   renderTab(activeTab);
+  updateUndoButtons();
 }
 async function refreshActiveLock() {
   activeLocked = false;
@@ -482,10 +522,10 @@ function renderTab1() {
 }
 function renderTab2or3(tabNum, targetRole) {
   const notice = document.getElementById(`tab${tabNum}Notice`);
-  const count = targetRole === "curious" ? counters.curiousCount : counters.interviewerCount;
+  const count = targetRole === "curious" ? courseScopedCounts.curious : courseScopedCounts.interviewer;
   if (count < MIN_FOR_OBSERVATION) {
     notice.className = "notice error";
-    notice.textContent = `There are not many ${targetRole === "curious" ? "curious students" : "interviewers"} registered yet (currently ${count}) — let a few more people sign up and check back later.`;
+    notice.textContent = `There aren't many ${targetRole === "curious" ? "curious students" : "interviewers"} registered yet for the courses you're interested in (currently ${count}). You may want to wait for a few more people to sign up and check back later. You can approve just your active role for now, and come back later under the same name to add this.`;
     notice.classList.remove("hidden");
   } else {
     notice.classList.add("hidden");
@@ -514,12 +554,14 @@ function computeBoxesForDate(tabNum, date, slot) {
       const mineOccupant = session[role] && session[role].uid === myUid;
       const occupiedBySame = session[role] && !mineOccupant;
       const occupiedByOpposite = !!session[oppositeRole];
-      let tier, clickable;
-      if (occupiedBySame) { tier = "tier-red"; clickable = false; }
-      else if (occupiedByOpposite) { tier = "tier-green-orange"; clickable = true; }
+      let tier, clickable, explain = null;
+      if (occupiedBySame) {
+        tier = "tier-red"; clickable = false;
+        explain = `This slot's ${role === "curious" ? "Curious Student" : "Interviewer"} position is already taken. Please pick a different slot or role.`;
+      } else if (occupiedByOpposite) { tier = "tier-green-orange"; clickable = true; }
       else { tier = "tier-green"; clickable = true; }
       boxes.push({
-        course: e.course, type: e.type, tier, clickable,
+        course: e.course, type: e.type, tier, clickable, explain,
         selected: !!(draftActive && keyOf(draftActive) === key && draftActive.role === role),
         badge: null,
         onClick: clickable ? () => onTab1Click(e.course, date, slot, role) : null
@@ -531,13 +573,15 @@ function computeBoxesForDate(tabNum, date, slot) {
       const observers = session[targetRole + "Observers"] || [];
       const count = observers.length;
       const alreadyMine = draftObservations.some(o => keyOf(o) === key && o.targetRole === targetRole);
-      let tier, clickable;
-      if (count >= MAX_OBSERVERS) { tier = "tier-red"; clickable = false; }
-      else if (count === 2) { tier = "tier-orange-red"; clickable = true; }
+      let tier, clickable, explain = null;
+      if (count >= MAX_OBSERVERS) {
+        tier = "tier-red"; clickable = false;
+        explain = `This ${targetRole === "curious" ? "curious student" : "interviewer"} already has ${count} observers. Please pick a different session to observe.`;
+      } else if (count === 2) { tier = "tier-orange-red"; clickable = true; }
       else if (count === 1) { tier = "tier-green-orange"; clickable = true; }
       else { tier = "tier-green"; clickable = true; }
       boxes.push({
-        course: e.course, type: e.type, tier, clickable,
+        course: e.course, type: e.type, tier, clickable, explain,
         selected: alreadyMine,
         badge: count >= MAX_OBSERVERS ? `≥${MAX_OBSERVERS}` : String(count),
         onClick: clickable ? () => onObserverClick(tabNum, e.course, date, slot, targetRole, occupant, count) : null
@@ -560,11 +604,15 @@ function fontSizesFor(rows) {
 }
 function renderBox(b, dims) {
   const div = document.createElement("div");
-  div.className = `box ${b.tier}` + (b.clickable ? " clickable" : "") + (b.selected ? " selected" : "");
+  div.className = `box ${b.tier}` + (b.clickable ? " clickable" : "") + (b.selected ? " selected" : "") + (!b.clickable && b.explain ? " explainable" : "");
   const fs = fontSizesFor(dims.rows || 1);
   div.innerHTML = `<span class="code" style="font-size:${fs.code}px">${b.course}</span><span class="type" style="font-size:${fs.type}px">${b.type}</span>` +
     (b.badge != null ? `<span class="badge" style="font-size:${fs.badge}px">${b.badge}</span>` : "");
-  if (b.clickable && b.onClick) div.addEventListener("click", b.onClick);
+  if (b.clickable && b.onClick) {
+    div.addEventListener("click", b.onClick);
+  } else if (b.explain) {
+    div.addEventListener("click", () => showConfirmDialog({ text: b.explain, buttons: [{ label: "OK", action: () => {} }] }));
+  }
   return div;
 }
 
@@ -621,6 +669,7 @@ function onTab1Click(course, date, slot, role) {
   if (activeLocked) { showActiveLockedDialog(); return; }
   const key = `${course}_${date}_${slot}`;
   if (draftActive && keyOf(draftActive) === key && draftActive.role === role) return;
+  pushHistory();
   draftActive = { course, date, slot, role };
   renderTab(1);
   renderSummary();
@@ -633,6 +682,7 @@ function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count
   const key = `${course}_${date}_${slot}`;
   const idx = draftObservations.findIndex(o => keyOf(o) === key && o.targetRole === targetRole);
   if (idx >= 0) {
+    pushHistory();
     draftObservations.splice(idx, 1);
     renderTab(tabNum);
     renderSummary();
@@ -644,6 +694,7 @@ function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count
       buttons: [
         { label: "I understand", action: () => {} },
         { label: "I don't have other options — select anyway", action: () => {
+          pushHistory();
           draftObservations.push({ course, date, slot, targetRole, targetName: occupant.name });
           renderTab(tabNum);
           renderSummary();
@@ -652,6 +703,7 @@ function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count
     });
     return;
   }
+  pushHistory();
   draftObservations.push({ course, date, slot, targetRole, targetName: occupant.name });
   renderTab(tabNum);
   renderSummary();
@@ -663,15 +715,113 @@ function fmtEntry(course, date, slot) {
   const dow = DAY_NAMES[(toDate(date).getDay() + 6) % 7];
   return `${course} — ${c ? c.name : ""} · ${dow} ${fmtDay(date)} · ${SLOT_TIMES[slot]}`;
 }
+function entryBlock(roleLabel, course, date, slot) {
+  const c = COURSES.find(x => x.code === course);
+  const dow = DAY_NAMES[(toDate(date).getDay() + 6) % 7];
+  return `<div class="entry">
+    <span class="line-role">${roleLabel}</span>
+    <span class="line-course">${course} — ${c ? c.name : ""}</span>
+    <span class="line-day">${dow} ${fmtDay(date)}</span>
+    <span class="line-time">${SLOT_TIMES[slot]}</span>
+  </div>`;
+}
 function renderSummary() {
   const activeEl = document.getElementById("summaryActive");
   const obsEl = document.getElementById("summaryObservations");
   activeEl.innerHTML = "<strong>Active role</strong><br>" + (draftActive
-    ? `<div class="entry">${draftActive.role === "curious" ? "Curious Student" : "Interviewer"} — ${fmtEntry(draftActive.course, draftActive.date, draftActive.slot)}</div>`
+    ? entryBlock(draftActive.role === "curious" ? "Curious Student" : "Interviewer", draftActive.course, draftActive.date, draftActive.slot)
     : `<div class="entry">No active-role session selected yet.</div>`);
-  obsEl.innerHTML = "<strong>Observations</strong><br>" + (draftObservations.length
-    ? draftObservations.map(o => `<div class="entry">Observing ${o.targetName} (${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}) — ${fmtEntry(o.course, o.date, o.slot)}</div>`).join("")
-    : `<div class="entry">No observations selected yet.</div>`);
+  obsEl.innerHTML = "<strong>Observer roles</strong><br>"
+    + `<p class="hint">You don't have to add these now — you can come back later and enter the same name to add them.</p>`
+    + (draftObservations.length
+      ? draftObservations.map(o => entryBlock(`Observing ${o.targetName} (${o.targetRole === "curious" ? "Curious Student" : "Interviewer"})`, o.course, o.date, o.slot)).join("")
+      : `<div class="entry">No observer roles selected yet.</div>`);
+}
+function flashSummary() {
+  [document.getElementById("summaryActive"), document.getElementById("summaryObservations")].forEach(el => {
+    el.classList.remove("flash");
+    void el.offsetWidth; // restart the animation even if it's already mid-flash
+    el.classList.add("flash");
+  });
+}
+
+/* ---------------- undo ---------------- */
+function snapshotDraft() {
+  return { draftActive: draftActive ? { ...draftActive } : null, draftObservations: draftObservations.map(o => ({ ...o })) };
+}
+function pushHistory() {
+  historyStack.push(snapshotDraft());
+  if (historyStack.length > 20) historyStack.shift();
+  updateUndoButtons();
+}
+function updateUndoButtons() {
+  const enabled = nameConfirmed && historyStack.length > 0;
+  document.getElementById("undoLastBtn").disabled = !enabled;
+  document.getElementById("undoAllBtn").disabled = !enabled;
+}
+function undoLast() {
+  if (!historyStack.length) return;
+  const prev = historyStack.pop();
+  draftActive = prev.draftActive;
+  draftObservations = prev.draftObservations;
+  renderTab(activeTab);
+  renderSummary();
+  flashSummary();
+  updateUndoButtons();
+}
+function undoAll() {
+  if (!historyStack.length) return;
+  draftActive = origState.active ? { ...origState.active } : null;
+  draftObservations = origState.observations.map(o => ({ ...o }));
+  historyStack = [];
+  renderTab(activeTab);
+  renderSummary();
+  flashSummary();
+  updateUndoButtons();
+}
+function wireUndo() {
+  document.getElementById("undoLastBtn").addEventListener("click", undoLast);
+  document.getElementById("undoAllBtn").addEventListener("click", undoAll);
+  updateUndoButtons();
+}
+
+/* ---------------- explain the role ---------------- */
+const ROLE_EXPLANATIONS = {
+  active: {
+    title: "Active role — Curious Student or Interviewer",
+    html: `
+      <p><strong>Curious Student:</strong> pick a lecture from one of your courses. Your job is to make sure the lecture is understandable to everyone — even an imaginary "dummy student." Ask questions whenever you don't understand, and even when you do understand but feel the material lacks clarity. You're free to ask any basic question, or simply say "I don't understand" — no one else knows whether you genuinely don't know or are doing this on purpose. Ask at least one question every 25–30 minutes, so at least 4 in total; more is fine. Stuck for what to ask? Try "Can you please repeat that definition?" or "I'm not sure I followed that derivation — could you summarize it?" The same technique also works to slow a lecturer down when the pace is too fast.</p>
+      <p><strong>Interviewer:</strong> approach the lecturer after class — immediately after, or up to a week later — and ask at least two questions clarifying the lecture's content, plus at least one question placing the material in a broader context (of the course, or of science more generally) or connecting it to another subject. Make sure you understand the answers; if something's unclear, ask more. A good approach: catch the lecturer during the break for one or two questions, then again after class for one or two more — otherwise it can get time-cramped and you may need to schedule a separate meeting.</p>
+      <p>One lecture may have several curious students and interviewers, but where possible, try to spread out and cover more lectures and lecturers.</p>
+    `
+  },
+  observer: {
+    title: "Observer role",
+    html: `
+      <p>Each student needs two observers for their active role (Curious Student or Interviewer), and should in turn observe at least one interviewer and one curious student.</p>
+      <p>As an observer, you attend the session the other student chose for their active role, watch how they carry it out, give them feedback afterward, and reflect on what you saw. Use tabs 2 and 3 for this; tab 4 (Reserved observer) is a fallback for when you can't find a suitable session in either of those.</p>
+    `
+  }
+};
+function showInfoDialog(html) {
+  const overlay = document.getElementById("dialogOverlay");
+  const box = document.getElementById("dialogBox");
+  box.innerHTML = html;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = "Got it";
+  btn.addEventListener("click", () => overlay.classList.add("hidden"));
+  box.appendChild(btn);
+  overlay.classList.remove("hidden");
+}
+function wireExplainButtons() {
+  document.querySelectorAll(".explain-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tabNum = Number(btn.dataset.tab);
+      const content = tabNum === 1 ? ROLE_EXPLANATIONS.active : ROLE_EXPLANATIONS.observer;
+      showInfoDialog(`<h3 style="margin-top:0">${content.title}</h3>${content.html}`);
+    });
+  });
 }
 
 /* ---------------- dialog / toast ---------------- */
@@ -781,6 +931,8 @@ async function approveSelections() {
   });
 
   origState = { active: draftActive, observations: [...draftObservations], createdAt: origState.createdAt || new Date() };
+  historyStack = [];
+  updateUndoButtons();
   await refreshActiveLock();
 }
 

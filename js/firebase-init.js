@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, runTransaction,
+  getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, runTransaction,
   collection, query, where, onSnapshot, serverTimestamp, deleteField
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
@@ -18,6 +18,6 @@ export const authReady = new Promise((resolve, reject) => {
 });
 
 export {
-  doc, getDoc, setDoc, updateDoc, runTransaction,
+  doc, getDoc, getDocs, setDoc, updateDoc, runTransaction,
   collection, query, where, onSnapshot, serverTimestamp, deleteField
 };

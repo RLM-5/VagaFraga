@@ -1,4 +1,6 @@
 [
   { "code": "1FA352", "name": "Quantum Mechanics, Advanced Course" },
-  { "code": "1FA353", "name": "Symmetry and Group Theory in Physics" }
+  { "code": "1FA353", "name": "Symmetry and Group Theory in Physics" },
+  { "code": "9ZZ001", "name": "Layout Test Course A (fake, for box-packing test)" },
+  { "code": "9ZZ002", "name": "Layout Test Course B (fake, for box-packing test)" }
 ]
