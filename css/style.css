@@ -213,7 +213,6 @@ header {
 .week-num.week-deadline { background: #e88a2e; color: #fff; padding: 2px 8px; border-radius: 4px; }
 .week-num.week-postdeadline { color: #b53b3b; }
 .week-note { margin: 4px 0 8px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.week-note.week-deadline { color: #b5651d; }
 .cal-grid {
   display: grid;
   grid-template-columns: 90px repeat(5, 1fr);
