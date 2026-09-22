@@ -18,6 +18,13 @@ const WEEK_NOTES = {
 };
 const BALANCE_THRESHOLD = 7;
 const MIN_FOR_OBSERVATION = 3;
+// Name-field placeholder pool — mostly Astrid Lindgren characters, one
+// per page load, picked at random purely for a bit of local flavor.
+const PLACEHOLDER_NAMES = [
+  "Pettson Findus", "Emil Lönneberga", "Karlsson Taket", "Pippi Långstrump",
+  "Ronja Rövardotter", "Lotta Bråkmakargatan", "Alfons Åberg",
+  "Madicken Junibacken", "Nils Pyssling", "Mumin Mumindalen",
+];
 const MAX_OBSERVERS = 3;
 
 /* ---------------- date helpers ---------------- */
@@ -100,6 +107,9 @@ function rebuildMergedData() {
 }
 
 async function boot() {
+  document.getElementById("nameInput").placeholder =
+    `e.g. ${PLACEHOLDER_NAMES[Math.floor(Math.random() * PLACEHOLDER_NAMES.length)]}`;
+
   const [c, s] = await Promise.all([
     fetch("data/courses.json").then(r => r.json()),
     fetch("data/schedule.json").then(r => r.json())
