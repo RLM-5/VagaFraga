@@ -21,9 +21,9 @@ const MIN_FOR_OBSERVATION = 3;
 // Name-field placeholder pool — mostly Astrid Lindgren characters, one
 // per page load, picked at random purely for a bit of local flavor.
 const PLACEHOLDER_NAMES = [
-  "Pettson Findus", "Emil Lönneberga", "Karlsson Taket", "Pippi Långstrump",
-  "Ronja Rövardotter", "Lotta Bråkmakargatan", "Alfons Åberg",
-  "Madicken Junibacken", "Nils Pyssling", "Mumin Mumindalen",
+  "Pettson Findus", "Taket Karlsson", "Jum-Jum", "Bamse Skalman",
+  "Emil Lönneberga", "Madicken", "Nils Pyssling", "Lotta Bacon",
+  "Pippi Långstrump", "Ronja Rövardotter",
 ];
 const MAX_OBSERVERS = 3;
 
