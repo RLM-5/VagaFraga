@@ -43,6 +43,8 @@
     </div>
   </section>
 
+  <button id="addCourseBtn" type="button" class="add-course-btn">+ Add another course</button>
+
   <section class="tabs-and-summary">
     <div class="tabs-panel">
       <div class="tab-buttons">
@@ -96,6 +98,30 @@
 
 <div id="dialogOverlay" class="modal hidden">
   <div id="dialogBox" class="modal-box"></div>
+</div>
+
+<div id="addCourseModal" class="modal hidden">
+  <div class="modal-box wide">
+    <h3>Add a course that isn't in the list</h3>
+    <p class="muted-note">Use this only if a course or session is missing from the data. Fill in the code and name, then click on the calendar below to mark every time slot it meets. Adding it here only makes it available in the course picker — it does not register you for anything. After adding it, go back to the tabs below and select your own active or observer role for it, same as for any other course.</p>
+    <div class="add-course-fields">
+      <label>Course code<input id="newCourseCode" type="text" placeholder="e.g. 1XX999" /></label>
+      <label>Course name<input id="newCourseName" type="text" placeholder="e.g. Advanced Something" /></label>
+      <label>Event type for new clicks
+        <select id="newInstanceType">
+          <option>Lecture</option>
+          <option>Tutorial</option>
+          <option>Seminar</option>
+          <option>Other</option>
+        </select>
+      </label>
+    </div>
+    <div id="addCourseCalendar" class="calendar"></div>
+    <div class="modal-actions">
+      <button id="addCourseSubmitBtn" type="button">Add course</button>
+      <button id="addCourseCancelBtn" type="button">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast" class="toast hidden"></div>

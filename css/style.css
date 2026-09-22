@@ -91,6 +91,37 @@ header {
 .course-list li:hover { background: #f2f6fb; }
 .course-code { font-weight: 600; }
 
+.add-course-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #eef3fa;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+}
+.add-course-btn:hover { background: #e2ecf9; }
+
+.modal-box.wide { max-width: 760px; width: 90%; max-height: 85vh; overflow-y: auto; }
+.muted-note { color: var(--muted); font-size: 13px; }
+.add-course-fields { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0; }
+.add-course-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; flex: 1 1 160px; }
+.add-course-fields input, .add-course-fields select { padding: 6px 8px; font-size: 13px; font-weight: normal; }
+.modal-actions { margin-top: 14px; }
+.box.add-slot-placeholder {
+  background: #f5f5f5;
+  border: 1px dashed #bbb;
+  color: var(--muted);
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+}
+.box.add-slot-placeholder:hover { background: #ececec; }
+
 /* ---------- tabs + summary ---------- */
 .tabs-and-summary { display: flex; gap: 16px; align-items: flex-start; }
 .tabs-panel { flex: 0 0 66%; max-width: 66%; }

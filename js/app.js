@@ -41,8 +41,11 @@ function emptySession(key) {
 }
 
 /* ---------------- global state ---------------- */
+let STATIC_COURSES = [];
+let STATIC_SCHEDULE = [];
+let customCourses = new Map();  // code -> {code,name,addedBy}
+let customSchedule = new Map(); // "code_date_slot" -> {course,date,slot,type}
 let COURSES = [];
-let SCHEDULE = [];
 let scheduleByDateSlot = new Map(); // "date_slot" -> [{course,type}]
 let selectedCourses = new Set();
 
@@ -61,33 +64,58 @@ let activeTab = 1;
 let weekState = { 1: FIRST_MONDAY, 2: FIRST_MONDAY, 3: FIRST_MONDAY, 4: FIRST_MONDAY };
 let weekSessionsByTab = { 1: new Map(), 2: new Map(), 3: new Map(), 4: new Map() };
 let unsubByTab = { 1: null, 2: null, 3: null, 4: null };
+let subscribedWeekByTab = { 1: null, 2: null, 3: null, 4: null };
 let counters = { curiousCount: 0, interviewerCount: 0 };
 
 /* ---------------- boot ---------------- */
+// Course/schedule data is the static JSON plus whatever students have
+// added via "Add another course" (stored in Firestore, live for everyone).
+// Both sources feed the same merged COURSES / scheduleByDateSlot that the
+// rest of the app reads, so a newly added course behaves identically to
+// a built-in one everywhere (picker, search, calendar, box packing).
+function rebuildMergedData() {
+  const merged = [...STATIC_COURSES, ...customCourses.values()];
+  COURSES = merged.sort((a, b) => a.code.localeCompare(b.code));
+  scheduleByDateSlot = new Map();
+  for (const e of [...STATIC_SCHEDULE, ...customSchedule.values()]) {
+    const k = `${e.date}_${e.slot}`;
+    if (!scheduleByDateSlot.has(k)) scheduleByDateSlot.set(k, []);
+    scheduleByDateSlot.get(k).push(e);
+  }
+  renderCourseLists();
+  if (nameConfirmed) renderTab(activeTab);
+}
+
 async function boot() {
   const [c, s] = await Promise.all([
     fetch("data/courses.json").then(r => r.json()),
     fetch("data/schedule.json").then(r => r.json())
   ]);
-  COURSES = c.sort((a, b) => a.code.localeCompare(b.code));
-  SCHEDULE = s;
-  scheduleByDateSlot = new Map();
-  for (const e of SCHEDULE) {
-    const k = `${e.date}_${e.slot}`;
-    if (!scheduleByDateSlot.has(k)) scheduleByDateSlot.set(k, []);
-    scheduleByDateSlot.get(k).push(e);
-  }
+  STATIC_COURSES = c;
+  STATIC_SCHEDULE = s;
+  rebuildMergedData();
 
-  renderCourseLists();
   wireHeader();
   wireTabs();
   wireApprove();
+  wireAddCourse();
 
   authReady.then(u => { myUid = u.uid; });
 
   onSnapshot(doc(db, "meta", "counters"), snap => {
     counters = snap.exists() ? snap.data() : { curiousCount: 0, interviewerCount: 0 };
     if (activeTab === 1) renderTab(1);
+  });
+
+  onSnapshot(collection(db, "customCourses"), snap => {
+    customCourses = new Map();
+    snap.forEach(d => customCourses.set(d.id, d.data()));
+    rebuildMergedData();
+  });
+  onSnapshot(collection(db, "customSchedule"), snap => {
+    customSchedule = new Map();
+    snap.forEach(d => customSchedule.set(d.id, d.data()));
+    rebuildMergedData();
   });
 }
 document.addEventListener("DOMContentLoaded", boot);
@@ -148,6 +176,110 @@ function wireCoursePicker() {
   });
 }
 wireCoursePicker();
+
+/* ---------------- add-course modal ---------------- */
+let addCourseWeek = FIRST_MONDAY;
+let pendingInstances = []; // {date, slot, type}
+
+function wireAddCourse() {
+  document.getElementById("addCourseBtn").addEventListener("click", openAddCourseModal);
+  document.getElementById("addCourseCancelBtn").addEventListener("click", closeAddCourseModal);
+  document.getElementById("addCourseSubmitBtn").addEventListener("click", submitAddCourse);
+}
+function openAddCourseModal() {
+  document.getElementById("newCourseCode").value = "";
+  document.getElementById("newCourseName").value = "";
+  pendingInstances = [];
+  addCourseWeek = FIRST_MONDAY;
+  document.getElementById("addCourseModal").classList.remove("hidden");
+  renderAddCourseCalendar();
+}
+function closeAddCourseModal() {
+  document.getElementById("addCourseModal").classList.add("hidden");
+}
+function renderAddCourseCalendar() {
+  const container = document.getElementById("addCourseCalendar");
+  container.innerHTML = "";
+  const monday = addCourseWeek;
+
+  const nav = document.createElement("div");
+  nav.className = "week-nav";
+  const prevBtn = document.createElement("button"); prevBtn.type = "button"; prevBtn.textContent = "← Previous week";
+  const nextBtn = document.createElement("button"); nextBtn.type = "button"; nextBtn.textContent = "Next week →";
+  const wn = document.createElement("span"); wn.className = "week-num"; wn.textContent = `Week ${isoWeek(monday)}`;
+  prevBtn.disabled = monday <= FIRST_MONDAY;
+  nextBtn.disabled = monday >= LAST_MONDAY;
+  prevBtn.addEventListener("click", () => { addCourseWeek = addDays(addCourseWeek, -7); renderAddCourseCalendar(); });
+  nextBtn.addEventListener("click", () => { addCourseWeek = addDays(addCourseWeek, 7); renderAddCourseCalendar(); });
+  nav.append(prevBtn, wn, nextBtn);
+  container.appendChild(nav);
+
+  const grid = document.createElement("div");
+  grid.className = "cal-grid";
+  grid.appendChild(document.createElement("div"));
+  for (let i = 0; i < 5; i++) {
+    const dateStr = addDays(monday, i);
+    const head = document.createElement("div");
+    head.className = "cal-head";
+    head.textContent = `${DAY_NAMES[i]} ${fmtDay(dateStr)}`;
+    grid.appendChild(head);
+  }
+  for (let slot = 0; slot < 4; slot++) {
+    const timeCell = document.createElement("div");
+    timeCell.className = "cal-time";
+    timeCell.textContent = SLOT_TIMES[slot];
+    grid.appendChild(timeCell);
+    for (let i = 0; i < 5; i++) {
+      const dateStr = addDays(monday, i);
+      const cell = document.createElement("div");
+      cell.className = "cal-cell";
+      cell.style.gridTemplateColumns = "1fr";
+      cell.style.gridTemplateRows = "1fr";
+      const idx = pendingInstances.findIndex(p => p.date === dateStr && p.slot === slot);
+      const box = document.createElement("div");
+      if (idx >= 0) {
+        const p = pendingInstances[idx];
+        box.className = "box tier-green clickable selected";
+        box.innerHTML = `<span class="code" style="font-size:11px">${p.type}</span><span class="type" style="font-size:10px">click to remove</span>`;
+        box.addEventListener("click", () => { pendingInstances.splice(idx, 1); renderAddCourseCalendar(); });
+      } else {
+        box.className = "box add-slot-placeholder clickable";
+        box.innerHTML = `<span class="type" style="font-size:11px">+ add</span>`;
+        box.addEventListener("click", () => {
+          const type = document.getElementById("newInstanceType").value;
+          pendingInstances.push({ date: dateStr, slot, type });
+          renderAddCourseCalendar();
+        });
+      }
+      cell.appendChild(box);
+      grid.appendChild(cell);
+    }
+  }
+  container.appendChild(grid);
+}
+async function submitAddCourse() {
+  const codeRaw = document.getElementById("newCourseCode").value.trim();
+  const nameRaw = document.getElementById("newCourseName").value.trim();
+  if (!codeRaw || !nameRaw) { toast("Please fill in both the course code and the course name."); return; }
+  if (!pendingInstances.length) { toast("Click at least one calendar slot to mark when this course meets."); return; }
+  const code = codeRaw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!code) { toast("Please enter a valid course code."); return; }
+  if (COURSES.some(c => c.code.toUpperCase() === code)) { toast("That course code already exists — pick it from the list instead of re-adding it."); return; }
+
+  await authReady;
+  try {
+    await setDoc(doc(db, "customCourses", code), { code, name: nameRaw, addedBy: currentName || "anonymous", createdAt: serverTimestamp() });
+    await Promise.all(pendingInstances.map(p =>
+      setDoc(doc(db, "customSchedule", `${code}_${p.date}_${p.slot}`), { course: code, date: p.date, slot: p.slot, type: p.type })
+    ));
+    selectedCourses.add(code);
+    closeAddCourseModal();
+    toast("Course added — don't forget to go to the tabs below and select your own role for it.");
+  } catch (err) {
+    console.error(err);
+    toast("Could not add the course. Please try again.");
+  }
+}
 
 /* ---------------- header / name flow ---------------- */
 function wireHeader() {
@@ -292,9 +424,15 @@ function switchTab(n) {
   renderTab(n);
 }
 
+// renderTab() calls this on every render, so it must be a no-op when the
+// tab is already subscribed to the right week — otherwise the snapshot
+// callback's own renderTab() call would tear down and recreate the
+// listener on every update, looping forever against Firestore.
 function ensureWeekListener(tabNum) {
-  if (unsubByTab[tabNum]) unsubByTab[tabNum]();
   const monday = weekState[tabNum];
+  if (subscribedWeekByTab[tabNum] === monday && unsubByTab[tabNum]) return;
+  if (unsubByTab[tabNum]) unsubByTab[tabNum]();
+  subscribedWeekByTab[tabNum] = monday;
   const q = query(collection(db, "sessions"), where("weekStart", "==", monday));
   unsubByTab[tabNum] = onSnapshot(q, snap => {
     const m = new Map();

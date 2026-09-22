@@ -2,10 +2,10 @@
 // These values are meant to be public — they only identify the project,
 // they do not grant write access by themselves (that's controlled by firestore.rules).
 export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME"
+  apiKey: "AIzaSyAQyI6CC3x41WU-7OjuTJ5ZyNNjhwonFsg",
+  authDomain: "vagafraga-test.firebaseapp.com",
+  projectId: "vagafraga-test",
+  storageBucket: "vagafraga-test.firebasestorage.app",
+  messagingSenderId: "835790241060",
+  appId: "1:835790241060:web:3a1f33f325fd1939ae87b1"
 };

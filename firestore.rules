@@ -3,15 +3,19 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Student records. Readable by anyone using the app (needed for the
-    // duplicate-name check and for course/session lookups). Writes are
-    // restricted to the anonymous uid that created the record, so one
-    // student can't edit or delete another's entry.
+    // duplicate-name check and for course/session lookups).
+    // The app's identity boundary is the name a student types and
+    // confirms, not the device they're on — a student is expected to be
+    // able to return on a different browser/computer and still edit
+    // their own entry under the same name. Anonymous auth's uid is
+    // per-browser, so it can't be used to gate updates without breaking
+    // that promise; any signed-in (anonymous) client may write here,
+    // same trust level as the rest of this no-login app.
     match /students/{slug} {
       allow read: if true;
       allow create: if request.auth != null
                     && request.resource.data.ownerUid == request.auth.uid;
-      allow update, delete: if request.auth != null
-                    && resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if request.auth != null;
     }
 
     // Session docs are the shared "who's doing what, when" state that
@@ -27,6 +31,21 @@ service cloud.firestore {
     match /meta/counters {
       allow read: if true;
       allow write: if request.auth != null;
+    }
+
+    // Courses/sessions students add themselves via "Add another course".
+    // Readable by everyone so they show up in the shared picker and
+    // calendar; kept append-only for now (no edit/delete) to avoid
+    // needing ownership tracking for a rarely-used, low-stakes feature.
+    match /customCourses/{code} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+    match /customSchedule/{id} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
     }
   }
 }
