@@ -218,10 +218,26 @@ function wireAddCourse() {
   document.getElementById("addCourseBtn").addEventListener("click", openAddCourseModal);
   document.getElementById("addCourseCancelBtn").addEventListener("click", closeAddCourseModal);
   document.getElementById("addCourseSubmitBtn").addEventListener("click", submitAddCourse);
+  document.getElementById("newCourseCode").addEventListener("input", syncAddCourseNameField);
+}
+// If the typed code matches a course that already exists, this is really
+// "add a missing session" — lock the name to the real one instead of
+// letting it be retyped, so the two paths in submitAddCourse can't drift.
+function syncAddCourseNameField() {
+  const code = document.getElementById("newCourseCode").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const nameInput = document.getElementById("newCourseName");
+  const existing = COURSES.find(c => c.code.toUpperCase() === code);
+  if (existing) {
+    nameInput.value = existing.name;
+    nameInput.disabled = true;
+  } else {
+    nameInput.disabled = false;
+  }
 }
 function openAddCourseModal() {
   document.getElementById("newCourseCode").value = "";
   document.getElementById("newCourseName").value = "";
+  document.getElementById("newCourseName").disabled = false;
   pendingInstances = [];
   addCourseWeek = FIRST_MONDAY;
   document.getElementById("addCourseModal").classList.remove("hidden");
@@ -293,22 +309,27 @@ function renderAddCourseCalendar() {
 async function submitAddCourse() {
   const codeRaw = document.getElementById("newCourseCode").value.trim();
   const nameRaw = document.getElementById("newCourseName").value.trim();
-  if (!codeRaw || !nameRaw) { toast("Please fill in both the course code and the course name."); return; }
-  if (!pendingInstances.length) { toast("Click at least one calendar slot to mark when this course meets."); return; }
+  if (!codeRaw) { toast("Please fill in the course code."); return; }
+  if (!pendingInstances.length) { toast("Click at least one calendar slot to mark the session(s) you're adding."); return; }
   const code = codeRaw.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!code) { toast("Please enter a valid course code."); return; }
-  if (COURSES.some(c => c.code.toUpperCase() === code)) { toast("That course code already exists — pick it from the list instead of re-adding it."); return; }
+  const existing = COURSES.find(c => c.code.toUpperCase() === code);
+  if (!existing && !nameRaw) { toast("Please fill in the course name."); return; }
 
   await authReady;
   try {
-    await setDoc(doc(db, "customCourses", code), { code, name: nameRaw, addedBy: currentName || "anonymous", createdAt: serverTimestamp() });
+    if (!existing) {
+      await setDoc(doc(db, "customCourses", code), { code, name: nameRaw, addedBy: currentName || "anonymous", createdAt: serverTimestamp() });
+    }
     await Promise.all(pendingInstances.map(p =>
       setDoc(doc(db, "customSchedule", `${code}_${p.date}_${p.slot}`), { course: code, date: p.date, slot: p.slot, type: p.type })
     ));
     selectedCourses.add(code);
     refreshCourseScopedCounts();
     closeAddCourseModal();
-    toast("Course added — don't forget to go to the tabs below and select your own role for it.");
+    toast(existing
+      ? "Session added — don't forget to go to the tabs below and select your own role for it."
+      : "Course added — don't forget to go to the tabs below and select your own role for it.");
   } catch (err) {
     console.error(err);
     toast("Could not add the course. Please try again.");
