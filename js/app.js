@@ -1049,6 +1049,32 @@ function fallbackCopy(text) {
   document.body.removeChild(ta);
   toast(ok ? "Copied to clipboard." : "Couldn't copy automatically — please select and copy the text below.");
 }
+// Safari (macOS/iOS) specifically intercepts a plain <a> click whose href
+// is a "data:text/calendar" URI and shows its native "Add Event" popover
+// right there, handing off to Calendar.app directly — no navigation, no
+// file saved. That trick only fires for that exact href form though; a
+// blob: URL (even opened as a plain navigation) is just downloaded, which
+// is what was happening before. Other browsers don't have an equivalent
+// one-click hook, so they get a normal file — .download forces a save
+// instead of an unpredictable "should I display this?" prompt, and the
+// toast tells the user to open it themselves to hand it to whatever
+// calendar app is installed.
+function addToCalendar(events) {
+  const ics = buildIcs(events);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if (isSafari) {
+    const a = document.createElement("a");
+    a.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+    a.click();
+  } else {
+    const blob = new Blob([ics], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "vagafraga.ics"; a.click();
+    URL.revokeObjectURL(url);
+    toast("A calendar file was downloaded — open it to add these events to your calendar app.");
+  }
+}
 function showApprovalConfirmation() {
   const text = buildSummaryText();
   const events = collectEvents();
@@ -1072,17 +1098,6 @@ function showApprovalConfirmation() {
     a.click();
     toast("Opening your email client — if nothing opens, your browser may not have one set as default. Try Copy instead.");
   });
-  document.getElementById("icsBtn").addEventListener("click", () => {
-    // No .download attribute on purpose: that forces a save-as-file in
-    // every browser. Left as a plain navigation, browsers that know what
-    // to do with a calendar file (Safari, for one) hand it straight to
-    // whatever calendar app is registered on the device instead of
-    // downloading it — there's no third-party calendar service involved
-    // either way, just the file and the OS's own handling of it.
-    const blob = new Blob([buildIcs(events)], { type: "text/calendar" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  });
+  document.getElementById("icsBtn").addEventListener("click", () => addToCalendar(events));
   document.getElementById("closeConfirmBtn").addEventListener("click", () => overlay.classList.add("hidden"));
 }
