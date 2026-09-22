@@ -734,7 +734,7 @@ function renderSummary() {
   obsEl.innerHTML = "<strong>Observer roles</strong><br>"
     + `<p class="hint">You don't have to add these now — you can come back later and enter the same name to add them.</p>`
     + (draftObservations.length
-      ? draftObservations.map(o => entryBlock(`Observing ${o.targetName} (${o.targetRole === "curious" ? "Curious Student" : "Interviewer"})`, o.course, o.date, o.slot)).join("")
+      ? draftObservations.map(o => entryBlock(`Observing: ${o.targetName} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}")`, o.course, o.date, o.slot)).join("")
       : `<div class="entry">No observer roles selected yet.</div>`);
 }
 function flashSummary() {
@@ -943,7 +943,7 @@ function buildSummaryText() {
   lines.push(draftActive ? `  ${draftActive.role === "curious" ? "Curious Student" : "Interviewer"} — ${fmtEntry(draftActive.course, draftActive.date, draftActive.slot)}` : "  (none)");
   lines.push("");
   lines.push("Observations:");
-  if (draftObservations.length) draftObservations.forEach(o => lines.push(`  Observing ${o.targetName} (${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}) — ${fmtEntry(o.course, o.date, o.slot)}`));
+  if (draftObservations.length) draftObservations.forEach(o => lines.push(`  Observing: ${o.targetName} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}") — ${fmtEntry(o.course, o.date, o.slot)}`));
   else lines.push("  (none)");
   return lines.join("\n");
 }
