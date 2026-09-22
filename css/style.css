@@ -155,12 +155,8 @@ header {
 .box.clickable { cursor: pointer; }
 .box.clickable:hover { filter: brightness(0.95); }
 .box.selected { outline: 3px solid var(--accent); outline-offset: -3px; }
-.box .code { font-weight: 700; }
-.box .type { color: rgba(0,0,0,0.65); }
-.box.fs-normal .code { font-size: 12px; }
-.box.fs-normal .type { font-size: 11px; }
-.box.fs-small .code { font-size: 10px; }
-.box.fs-small .type { font-size: 9px; }
+.box .code { font-weight: 700; display: block; }
+.box .type { color: rgba(0,0,0,0.65); display: block; }
 .box .badge {
   position: absolute; top: 2px; right: 3px; font-size: 10px; font-weight: 700;
   background: rgba(255,255,255,0.75); border-radius: 3px; padding: 0 3px;

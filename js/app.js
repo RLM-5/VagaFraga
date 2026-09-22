@@ -127,18 +127,24 @@ function courseRow(c, onToggle) {
   li.appendChild(label);
   return li;
 }
+function pruneDraftToSelectedCourses() {
+  if (draftActive && !selectedCourses.has(draftActive.course)) draftActive = null;
+  draftObservations = draftObservations.filter(o => selectedCourses.has(o.course));
+}
 function toggleCourse(code) {
   if (selectedCourses.has(code)) selectedCourses.delete(code); else selectedCourses.add(code);
+  pruneDraftToSelectedCourses();
   renderCourseLists();
-  if (nameConfirmed) renderTab(activeTab);
+  if (nameConfirmed) { renderTab(activeTab); renderSummary(); }
 }
 function wireCoursePicker() {
   document.getElementById("courseSearch").addEventListener("input", renderCourseLists);
   document.getElementById("selectAllBtn").addEventListener("click", () => {
     const allSelected = COURSES.length > 0 && COURSES.every(c => selectedCourses.has(c.code));
     selectedCourses = allSelected ? new Set() : new Set(COURSES.map(c => c.code));
+    pruneDraftToSelectedCourses();
     renderCourseLists();
-    if (nameConfirmed) renderTab(activeTab);
+    if (nameConfirmed) { renderTab(activeTab); renderSummary(); }
   });
 }
 wireCoursePicker();
@@ -321,16 +327,17 @@ function renderTab1() {
   interviewerRadio.disabled = false;
   notice.classList.add("hidden");
   const diff = counters.curiousCount - counters.interviewerCount;
+  const c = counters.curiousCount, i = counters.interviewerCount;
   if (diff > BALANCE_THRESHOLD) {
     curiousRadio.disabled = true;
     if (curiousRadio.checked) { curiousRadio.checked = false; interviewerRadio.checked = true; }
-    notice.textContent = "There is currently a strong imbalance toward Curious Student in the class. You may only select Interviewer for now — or wait a little and check back once the balance improves.";
+    notice.textContent = `Currently there is a strong imbalance toward Curious Student in the class (${c} Curious Students vs. ${i} Interviewers). You may only select Interviewer for now — or wait a little and check back once the balance improves.`;
     notice.className = "notice info";
     notice.classList.remove("hidden");
   } else if (-diff > BALANCE_THRESHOLD) {
     interviewerRadio.disabled = true;
     if (interviewerRadio.checked) { interviewerRadio.checked = false; curiousRadio.checked = true; }
-    notice.textContent = "There is currently a strong imbalance toward Interviewer in the class. You may only select Curious Student for now — or wait a little and check back once the balance improves.";
+    notice.textContent = `Currently there is a strong imbalance toward Interviewer in the class (${i} Interviewers vs. ${c} Curious Students). You may only select Curious Student for now — or wait a little and check back once the balance improves.`;
     notice.className = "notice info";
     notice.classList.remove("hidden");
   }
@@ -340,7 +347,7 @@ function renderTab2or3(tabNum, targetRole) {
   const count = targetRole === "curious" ? counters.curiousCount : counters.interviewerCount;
   if (count < MIN_FOR_OBSERVATION) {
     notice.className = "notice error";
-    notice.textContent = `There are not many ${targetRole === "curious" ? "curious students" : "interviewers"} registered yet — let a few more people sign up and check back later.`;
+    notice.textContent = `There are not many ${targetRole === "curious" ? "curious students" : "interviewers"} registered yet (currently ${count}) — let a few more people sign up and check back later.`;
     notice.classList.remove("hidden");
   } else {
     notice.classList.add("hidden");
@@ -401,10 +408,24 @@ function computeBoxesForDate(tabNum, date, slot) {
   }
   return boxes;
 }
-function renderBox(b, fsClass) {
+// Font size is derived from the same `rows` value that drives the grid
+// layout, computed at the same render pass — so a repack (course
+// selection changing box count) can never leave text out of sync with
+// the box size that was just resized around it.
+function fontSizesFor(rows) {
+  const shrink = Math.max(0, rows - 2);
+  return {
+    code: Math.max(8, 13 - shrink * 1.8).toFixed(1),
+    type: Math.max(7, 11 - shrink * 1.5).toFixed(1),
+    badge: Math.max(8, 10 - shrink * 1.2).toFixed(1)
+  };
+}
+function renderBox(b, dims) {
   const div = document.createElement("div");
-  div.className = `box ${b.tier} ${fsClass}` + (b.clickable ? " clickable" : "") + (b.selected ? " selected" : "");
-  div.innerHTML = `<span class="code">${b.course}</span><span class="type">${b.type}</span>` + (b.badge != null ? `<span class="badge">${b.badge}</span>` : "");
+  div.className = `box ${b.tier}` + (b.clickable ? " clickable" : "") + (b.selected ? " selected" : "");
+  const fs = fontSizesFor(dims.rows || 1);
+  div.innerHTML = `<span class="code" style="font-size:${fs.code}px">${b.course}</span><span class="type" style="font-size:${fs.type}px">${b.type}</span>` +
+    (b.badge != null ? `<span class="badge" style="font-size:${fs.badge}px">${b.badge}</span>` : "");
   if (b.clickable && b.onClick) div.addEventListener("click", b.onClick);
   return div;
 }
@@ -450,8 +471,7 @@ function renderCalendarShell(tabNum) {
       const dims = layoutDims(boxes.length);
       cell.style.gridTemplateColumns = `repeat(${dims.cols || 1}, 1fr)`;
       cell.style.gridTemplateRows = `repeat(${dims.rows || 1}, 1fr)`;
-      const fsClass = dims.rows >= 3 ? "fs-small" : "fs-normal";
-      boxes.forEach(b => cell.appendChild(renderBox(b, fsClass)));
+      boxes.forEach(b => cell.appendChild(renderBox(b, dims)));
       grid.appendChild(cell);
     }
   }
