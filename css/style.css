@@ -210,6 +210,11 @@ header {
 .week-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .week-nav button { padding: 4px 10px; cursor: pointer; }
 .week-num { font-weight: 600; }
+.week-num.week-deadline { background: #e88a2e; color: #fff; padding: 2px 8px; border-radius: 4px; }
+.week-num.week-postdeadline { color: #b53b3b; }
+.week-note { margin: 4px 0 8px; font-size: 12px; font-weight: 600; }
+.week-note.week-deadline { color: #b5651d; }
+.week-note.week-postdeadline { color: #b53b3b; }
 .cal-grid {
   display: grid;
   grid-template-columns: 90px repeat(5, 1fr);

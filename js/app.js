@@ -10,6 +10,12 @@ const SLOT_END = ["10:00", "12:00", "15:00", "17:00"];
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const FIRST_MONDAY = "2026-09-21";
 const LAST_MONDAY = "2026-10-26";
+// Deadline call-outs shown under the week selector, keyed by ISO week number.
+const WEEK_NOTES = {
+  42: { cls: "week-deadline", text: "HW2 submission deadline: 14th October." },
+  43: { cls: "week-postdeadline", text: "Post-deadline week. An extension is possible only if justified — i.e. no free options were left in prior weeks." },
+  44: { cls: "week-postdeadline", text: "Post-deadline week. An extension is possible only if justified — i.e. no free options were left in prior weeks." },
+};
 const BALANCE_THRESHOLD = 7;
 const MIN_FOR_OBSERVATION = 3;
 const MAX_OBSERVERS = 3;
@@ -649,17 +655,26 @@ function renderCalendarShell(tabNum) {
   container.innerHTML = "";
   const monday = weekState[tabNum];
 
+  const weekNum = isoWeek(monday);
+  const note = WEEK_NOTES[weekNum];
+
   const nav = document.createElement("div");
   nav.className = "week-nav";
   const prevBtn = document.createElement("button"); prevBtn.type = "button"; prevBtn.textContent = "← Previous week";
   const nextBtn = document.createElement("button"); nextBtn.type = "button"; nextBtn.textContent = "Next week →";
-  const wn = document.createElement("span"); wn.className = "week-num"; wn.textContent = `Week ${isoWeek(monday)}`;
+  const wn = document.createElement("span"); wn.className = "week-num" + (note ? ` ${note.cls}` : ""); wn.textContent = `Week ${weekNum}`;
   prevBtn.disabled = monday <= FIRST_MONDAY;
   nextBtn.disabled = monday >= LAST_MONDAY;
   prevBtn.addEventListener("click", () => { weekState[tabNum] = addDays(weekState[tabNum], -7); ensureWeekListener(tabNum); renderCalendarShell(tabNum); });
   nextBtn.addEventListener("click", () => { weekState[tabNum] = addDays(weekState[tabNum], 7); ensureWeekListener(tabNum); renderCalendarShell(tabNum); });
   nav.append(prevBtn, wn, nextBtn);
   container.appendChild(nav);
+  if (note) {
+    const noteEl = document.createElement("p");
+    noteEl.className = `week-note ${note.cls}`;
+    noteEl.textContent = note.text;
+    container.appendChild(noteEl);
+  }
 
   const grid = document.createElement("div");
   grid.className = "cal-grid";
