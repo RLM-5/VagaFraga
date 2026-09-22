@@ -497,7 +497,7 @@ function wireTabs() {
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => switchTab(Number(btn.dataset.tab)));
   });
-  document.querySelectorAll('input[name="tab1role"]').forEach(r => r.addEventListener("change", () => renderTab(1)));
+  document.querySelectorAll('input[name="tab1role"]').forEach(r => r.addEventListener("change", () => onTab1RoleChange(r)));
   document.querySelectorAll('input[name="tab4role"]').forEach(r => r.addEventListener("change", () => renderTab(4)));
 }
 function switchTab(n) {
@@ -725,9 +725,54 @@ function onTab1Click(course, date, slot, role) {
   draftActive = { course, date, slot, role };
   renderTab(1);
   renderSummary();
+  updateUndoButtons();
 }
 function showActiveLockedDialog() {
   showConfirmDialog({ text: document.getElementById("lockedNotice").innerHTML, buttons: [{ label: "OK", action: () => {} }] });
+}
+// Flipping the Curious/Interviewer radio while a session is already
+// selected used to just re-render the calendar for the new role — the
+// box highlight vanished (nothing matched the new role) but draftActive
+// itself never changed, so the summary panel silently kept showing the
+// old role. Now a flip is a real action: try to swap the currently
+// selected session to the new role, and either carry it through
+// everywhere (box, summary) or revert the radio and explain why not.
+async function onTab1RoleChange(radioEl) {
+  const newRole = radioEl.value;
+  if (!draftActive || draftActive.role === newRole) { renderTab(1); return; }
+  const revertRadio = () => {
+    document.querySelector(`input[name="tab1role"][value="${draftActive.role}"]`).checked = true;
+  };
+  if (activeLocked) {
+    revertRadio();
+    showActiveLockedDialog();
+    return;
+  }
+  const key = keyOf(draftActive);
+  let session;
+  try {
+    const snap = await getDoc(doc(db, "sessions", key));
+    session = snap.exists() ? snap.data() : emptySession(key);
+  } catch (err) {
+    console.error(err);
+    revertRadio();
+    toast("Couldn't check that slot right now — please try again.");
+    return;
+  }
+  const occupant = session[newRole];
+  if (occupant && occupant.slug !== currentSlug) {
+    revertRadio();
+    showConfirmDialog({
+      text: `Can't switch to ${newRole === "curious" ? "Curious Student" : "Interviewer"} for your selected session (${draftActive.course}) — that role there is already taken. Pick a different session for ${newRole === "curious" ? "Curious Student" : "Interviewer"} instead, or keep your current selection.`,
+      buttons: [{ label: "OK", action: () => {} }]
+    });
+    return;
+  }
+  pushHistory();
+  draftActive = { ...draftActive, role: newRole };
+  renderTab(1);
+  renderSummary();
+  updateUndoButtons();
 }
 function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count) {
   if (occupant.slug === currentSlug) { toast("You cannot observe yourself."); return; }
@@ -738,6 +783,7 @@ function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count
     draftObservations.splice(idx, 1);
     renderTab(tabNum);
     renderSummary();
+    updateUndoButtons();
     return;
   }
   if (count === 2) {
@@ -750,6 +796,7 @@ function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count
           draftObservations.push({ course, date, slot, targetRole, targetName: occupant.name });
           renderTab(tabNum);
           renderSummary();
+          updateUndoButtons();
         } }
       ]
     });
@@ -759,6 +806,7 @@ function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count
   draftObservations.push({ course, date, slot, targetRole, targetName: occupant.name });
   renderTab(tabNum);
   renderSummary();
+  updateUndoButtons();
 }
 
 /* ---------------- summary ---------------- */
@@ -807,9 +855,11 @@ function pushHistory() {
   updateUndoButtons();
 }
 function updateUndoButtons() {
-  const enabled = nameConfirmed && historyStack.length > 0;
-  document.getElementById("undoLastBtn").disabled = !enabled;
-  document.getElementById("undoAllBtn").disabled = !enabled;
+  const undoEnabled = nameConfirmed && historyStack.length > 0;
+  document.getElementById("undoLastBtn").disabled = !undoEnabled;
+  document.getElementById("undoAllBtn").disabled = !undoEnabled;
+  const eraseEnabled = nameConfirmed && (!!draftActive || draftObservations.length > 0);
+  document.getElementById("eraseAllBtn").disabled = !eraseEnabled;
 }
 function undoLast() {
   if (!historyStack.length) return;
@@ -831,9 +881,28 @@ function undoAll() {
   flashSummary();
   updateUndoButtons();
 }
+// Distinct from "Undo all": that restores the last-approved state (or
+// blank, for a first-time student). This wipes the draft to nothing
+// regardless of what's approved — for a returning student those aren't
+// the same thing. Still just a draft change, so it's undoable like any
+// other action; the locked active role (if any) is left alone, same as
+// everywhere else that respects that lock.
+function eraseAllSelections() {
+  if (!nameConfirmed) return;
+  if (!draftActive && !draftObservations.length) return;
+  pushHistory();
+  draftActive = activeLocked ? draftActive : null;
+  draftObservations = [];
+  renderTab(activeTab);
+  renderSummary();
+  flashSummary();
+  updateUndoButtons();
+  if (activeLocked) toast("Your active role already has observers and can't be cleared here — everything else was erased.");
+}
 function wireUndo() {
   document.getElementById("undoLastBtn").addEventListener("click", undoLast);
   document.getElementById("undoAllBtn").addEventListener("click", undoAll);
+  document.getElementById("eraseAllBtn").addEventListener("click", eraseAllSelections);
   updateUndoButtons();
 }
 

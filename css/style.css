@@ -44,6 +44,7 @@ header {
   border-radius: 6px;
 }
 .undo-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.erase-btn { color: #b53b3b; font-weight: 700; }
 .undo-btn:not(:disabled):hover { background: #e2e2e2; }
 /* A disabled <button> won't show its own `title` tooltip in most
    browsers, so the tooltip lives on this always-enabled wrapper instead. */
