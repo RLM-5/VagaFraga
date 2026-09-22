@@ -220,24 +220,28 @@ function wireAddCourse() {
   document.getElementById("addCourseSubmitBtn").addEventListener("click", submitAddCourse);
   document.getElementById("newCourseCode").addEventListener("input", syncAddCourseNameField);
 }
-// If the typed code matches a course that already exists, this is really
-// "add a missing session" — lock the name to the real one instead of
-// letting it be retyped, so the two paths in submitAddCourse can't drift.
+// Matching is always by CODE, never by name — if the typed code matches
+// a course that already exists, this is really "add a missing session."
+// The name field just gets the real name suggested in, still editable,
+// so it's clear what's about to happen without the field looking broken;
+// whatever ends up typed there is ignored at submit time regardless.
 function syncAddCourseNameField() {
   const code = document.getElementById("newCourseCode").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
   const nameInput = document.getElementById("newCourseName");
+  const hint = document.getElementById("addCourseCodeHint");
   const existing = COURSES.find(c => c.code.toUpperCase() === code);
   if (existing) {
     nameInput.value = existing.name;
-    nameInput.disabled = true;
+    hint.textContent = `"${code}" already exists as "${existing.name}" — you're adding a session to it, matched by code, so the name above is just a suggestion.`;
+    hint.classList.remove("hidden");
   } else {
-    nameInput.disabled = false;
+    hint.classList.add("hidden");
   }
 }
 function openAddCourseModal() {
   document.getElementById("newCourseCode").value = "";
   document.getElementById("newCourseName").value = "";
-  document.getElementById("newCourseName").disabled = false;
+  document.getElementById("addCourseCodeHint").classList.add("hidden");
   pendingInstances = [];
   addCourseWeek = FIRST_MONDAY;
   document.getElementById("addCourseModal").classList.remove("hidden");
