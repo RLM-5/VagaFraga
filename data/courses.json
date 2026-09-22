@@ -1,6 +1,86 @@
 [
-  { "code": "1FA352", "name": "Quantum Mechanics, Advanced Course" },
-  { "code": "1FA353", "name": "Symmetry and Group Theory in Physics" },
-  { "code": "9ZZ001", "name": "Layout Test Course A (fake, for box-packing test)" },
-  { "code": "9ZZ002", "name": "Layout Test Course B (fake, for box-packing test)" }
+  {
+    "code": "1FA008",
+    "name": "CFT and Strings"
+  },
+  {
+    "code": "1FA011",
+    "name": "QFT with Appl"
+  },
+  {
+    "code": "1FA028",
+    "name": "Representation Theory Integrable Systems"
+  },
+  {
+    "code": "1FA030",
+    "name": "Intro Master MP"
+  },
+  {
+    "code": "1FA033",
+    "name": "Fusion and Plasma"
+  },
+  {
+    "code": "1FA153",
+    "name": "Geometrical Methods in TP"
+  },
+  {
+    "code": "1FA163",
+    "name": "Analytical Mechanics"
+  },
+  {
+    "code": "1FA164",
+    "name": "Mathematica"
+  },
+  {
+    "code": "1FA209",
+    "name": "Cosmology"
+  },
+  {
+    "code": "1FA225",
+    "name": "Theoretical Astrophysics"
+  },
+  {
+    "code": "1FA252",
+    "name": "Electromagnetic Field Theory"
+  },
+  {
+    "code": "1FA253",
+    "name": "Fluid Mechanics"
+  },
+  {
+    "code": "1FA255",
+    "name": "Space Physics"
+  },
+  {
+    "code": "1FA257",
+    "name": "Classical Electrodynamics"
+  },
+  {
+    "code": "1FA352",
+    "name": "adv. Quant Mech"
+  },
+  {
+    "code": "1FA360",
+    "name": "QCD and EFT"
+  },
+  {
+    "code": "1FA404",
+    "name": "Energy Physics I"
+  },
+  {
+    "code": "1MA007",
+    "name": "Algebraic Structures"
+  },
+  {
+    "code": "1MA036",
+    "name": "Modules Homological Algebra"
+  },
+  {
+    "code": "1MA259",
+    "name": "Differential Topology"
+  },
+  {
+    "code": "1MA531",
+    "name": "Analytic Functions"
+  }
 ]

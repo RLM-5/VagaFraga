@@ -1,45 +1,1124 @@
 [
-  { "course": "1FA352", "date": "2026-09-21", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-09-21", "slot": 0, "type": "Lecture" },
-  { "course": "9ZZ001", "date": "2026-09-21", "slot": 0, "type": "Lecture" },
-  { "course": "9ZZ002", "date": "2026-09-21", "slot": 0, "type": "Seminar" },
-  { "course": "1FA352", "date": "2026-09-23", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-09-24", "slot": 2, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-09-24", "slot": 3, "type": "Tutorial" },
-  { "course": "1FA352", "date": "2026-09-25", "slot": 1, "type": "Tutorial" },
-
-  { "course": "1FA352", "date": "2026-09-28", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-09-28", "slot": 0, "type": "Lecture" },
-  { "course": "1FA352", "date": "2026-09-30", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-01", "slot": 2, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-01", "slot": 3, "type": "Tutorial" },
-  { "course": "1FA352", "date": "2026-10-02", "slot": 1, "type": "Tutorial" },
-
-  { "course": "1FA352", "date": "2026-10-05", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-05", "slot": 0, "type": "Lecture" },
-  { "course": "1FA352", "date": "2026-10-07", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-08", "slot": 2, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-08", "slot": 3, "type": "Tutorial" },
-  { "course": "1FA352", "date": "2026-10-09", "slot": 1, "type": "Tutorial" },
-
-  { "course": "1FA352", "date": "2026-10-12", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-12", "slot": 0, "type": "Lecture" },
-  { "course": "1FA352", "date": "2026-10-14", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-15", "slot": 2, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-15", "slot": 3, "type": "Tutorial" },
-  { "course": "1FA352", "date": "2026-10-16", "slot": 1, "type": "Tutorial" },
-
-  { "course": "1FA352", "date": "2026-10-19", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-19", "slot": 0, "type": "Lecture" },
-  { "course": "1FA352", "date": "2026-10-21", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-22", "slot": 2, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-22", "slot": 3, "type": "Tutorial" },
-  { "course": "1FA352", "date": "2026-10-23", "slot": 1, "type": "Tutorial" },
-
-  { "course": "1FA352", "date": "2026-10-26", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-26", "slot": 0, "type": "Lecture" },
-  { "course": "1FA352", "date": "2026-10-28", "slot": 0, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-29", "slot": 2, "type": "Lecture" },
-  { "course": "1FA353", "date": "2026-10-29", "slot": 3, "type": "Tutorial" },
-  { "course": "1FA352", "date": "2026-10-30", "slot": 1, "type": "Tutorial" }
+  {
+    "course": "1FA153",
+    "date": "2026-09-21",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-09-21",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-09-21",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-09-21",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-09-21",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-09-21",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-09-21",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-09-21",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-09-21",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-09-22",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA209",
+    "date": "2026-09-22",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA007",
+    "date": "2026-09-22",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-09-22",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-09-22",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-09-22",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-09-22",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-09-22",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA225",
+    "date": "2026-09-23",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-09-23",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA028",
+    "date": "2026-09-23",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-09-23",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-09-23",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-09-23",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-09-23",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA030",
+    "date": "2026-09-23",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-09-23",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-09-23",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-09-23",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-09-24",
+    "slot": 0,
+    "type": "Lesson"
+  },
+  {
+    "course": "1MA007",
+    "date": "2026-09-24",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-09-24",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA164",
+    "date": "2026-09-24",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-09-24",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-09-24",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-09-24",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-09-25",
+    "slot": 0,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-09-25",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-09-25",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-09-25",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-09-25",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-09-25",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-09-25",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA011",
+    "date": "2026-09-28",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA028",
+    "date": "2026-09-28",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-09-28",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-09-28",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-09-28",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-09-28",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-09-28",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-09-28",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-09-28",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA153",
+    "date": "2026-09-29",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA209",
+    "date": "2026-09-29",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-09-29",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA007",
+    "date": "2026-09-29",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA225",
+    "date": "2026-09-29",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-09-29",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-09-29",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-09-29",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA164",
+    "date": "2026-09-29",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA164",
+    "date": "2026-09-30",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-09-30",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-09-30",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-09-30",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-09-30",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA030",
+    "date": "2026-09-30",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-09-30",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-09-30",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-09-30",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA209",
+    "date": "2026-10-01",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-10-01",
+    "slot": 0,
+    "type": "Lesson"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-10-01",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA008",
+    "date": "2026-10-01",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-01",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-10-01",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-10-01",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-10-01",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1MA007",
+    "date": "2026-10-01",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA028",
+    "date": "2026-10-01",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-10-01",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-01",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA225",
+    "date": "2026-10-02",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-10-02",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-02",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-10-05",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-10-05",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-10-05",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-10-05",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA008",
+    "date": "2026-10-05",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-05",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA011",
+    "date": "2026-10-05",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-10-05",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-05",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-10-05",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-10-06",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA007",
+    "date": "2026-10-06",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-06",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-10-06",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA153",
+    "date": "2026-10-06",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-06",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-10-06",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-10-06",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-10-06",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-10-07",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA030",
+    "date": "2026-10-07",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-07",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-10-07",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-07",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-10-08",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA028",
+    "date": "2026-10-08",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-10-08",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA008",
+    "date": "2026-10-08",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-10-08",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-10-08",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA225",
+    "date": "2026-10-08",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-09",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-10-09",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-09",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-10-09",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-10-09",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-09",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-12",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-10-12",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA008",
+    "date": "2026-10-12",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA225",
+    "date": "2026-10-12",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-12",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-10-12",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA011",
+    "date": "2026-10-12",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-10-12",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-10-12",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-10-12",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-10-12",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-10-12",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-13",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-10-13",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-10-13",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-10-13",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA030",
+    "date": "2026-10-13",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA011",
+    "date": "2026-10-13",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-10-13",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-10-13",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-10-14",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-10-14",
+    "slot": 0,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA164",
+    "date": "2026-10-14",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-14",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-14",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-15",
+    "slot": 0,
+    "type": "Lesson"
+  },
+  {
+    "course": "1MA007",
+    "date": "2026-10-15",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA153",
+    "date": "2026-10-15",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA257",
+    "date": "2026-10-15",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-10-15",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-10-15",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-15",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-10-15",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-10-15",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA253",
+    "date": "2026-10-15",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-10-15",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-10-16",
+    "slot": 0,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-10-16",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA352",
+    "date": "2026-10-16",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA153",
+    "date": "2026-10-16",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA252",
+    "date": "2026-10-16",
+    "slot": 1,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-10-16",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA259",
+    "date": "2026-10-16",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA011",
+    "date": "2026-10-16",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA404",
+    "date": "2026-10-16",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1MA007",
+    "date": "2026-10-19",
+    "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA008",
+    "date": "2026-10-19",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-10-19",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-10-19",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA163",
+    "date": "2026-10-19",
+    "slot": 2,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA255",
+    "date": "2026-10-19",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA028",
+    "date": "2026-10-19",
+    "slot": 3,
+    "type": "Lesson"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-10-19",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA028",
+    "date": "2026-10-20",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA030",
+    "date": "2026-10-20",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-10-20",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA008",
+    "date": "2026-10-21",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA036",
+    "date": "2026-10-21",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA033",
+    "date": "2026-10-22",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-10-22",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-10-23",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-10-26",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA008",
+    "date": "2026-10-26",
+    "slot": 3,
+    "type": "Lecture"
+  },
+  {
+    "course": "1MA531",
+    "date": "2026-10-27",
+    "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA360",
+    "date": "2026-10-28",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA008",
+    "date": "2026-10-29",
+    "slot": 2,
+    "type": "Lecture"
+  }
 ]

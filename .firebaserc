@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "vagafraga-test"
+    "default": "vagafraga",
+    "prod": "vagafraga",
+    "test": "vagafraga-test"
   }
 }
