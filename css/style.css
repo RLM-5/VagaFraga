@@ -45,6 +45,9 @@ header {
 }
 .undo-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .undo-btn:not(:disabled):hover { background: #e2e2e2; }
+/* A disabled <button> won't show its own `title` tooltip in most
+   browsers, so the tooltip lives on this always-enabled wrapper instead. */
+.undo-wrap { display: inline-flex; }
 
 @keyframes flash-highlight {
   0% { background: #ffe9a8; }
@@ -132,6 +135,18 @@ header {
 .add-course-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; flex: 1 1 160px; }
 .add-course-fields input, .add-course-fields select { padding: 6px 8px; font-size: 13px; font-weight: normal; }
 .modal-actions { margin-top: 14px; }
+.ics-events { margin: 4px 0 12px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.ics-event-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 10px; font-size: 13px; border-bottom: 1px solid #eee;
+}
+.ics-event-row:last-child { border-bottom: none; }
+.gcal-link {
+  flex-shrink: 0; font-size: 12px; padding: 4px 9px; border-radius: 5px;
+  background: #eef3fa; border: 1px solid var(--accent); color: var(--accent);
+  text-decoration: none; white-space: nowrap;
+}
+.gcal-link:hover { background: #e2ecf9; }
 .box.add-slot-placeholder {
   background: #f5f5f5;
   border: 1px dashed #bbb;
@@ -150,7 +165,7 @@ header {
   background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
   padding: 14px; font-size: 13px;
 }
-.summary-panel h3 { margin-top: 0; }
+.summary-panel h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; }
 .summary-block { margin-bottom: 14px; min-height: 20px; }
 .summary-block .hint { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
 .summary-block .entry { padding: 6px 0; border-bottom: 1px solid #eee; line-height: 1.5; }

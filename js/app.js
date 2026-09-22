@@ -5,6 +5,8 @@ import {
 
 /* ---------------- constants ---------------- */
 const SLOT_TIMES = ["08:15–10:00", "10:15–12:00", "13:15–15:00", "15:15–17:00"];
+const SLOT_START = ["08:15", "10:15", "13:15", "15:15"];
+const SLOT_END = ["10:00", "12:00", "15:00", "17:00"];
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const FIRST_MONDAY = "2026-09-21";
 const LAST_MONDAY = "2026-10-26";
@@ -942,58 +944,110 @@ function buildSummaryText() {
   lines.push("Active role:");
   lines.push(draftActive ? `  ${draftActive.role === "curious" ? "Curious Student" : "Interviewer"} — ${fmtEntry(draftActive.course, draftActive.date, draftActive.slot)}` : "  (none)");
   lines.push("");
-  lines.push("Observations:");
+  lines.push("Observer roles:");
   if (draftObservations.length) draftObservations.forEach(o => lines.push(`  Observing: ${o.targetName} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}") — ${fmtEntry(o.course, o.date, o.slot)}`));
   else lines.push("  (none)");
   return lines.join("\n");
 }
-function buildIcs() {
+function collectEvents() {
   const events = [];
   if (draftActive) events.push(draftActive);
   draftObservations.forEach(o => events.push(o));
-  const pad = n => String(n).padStart(2, "0");
-  const SLOT_START = ["08:15", "10:15", "13:15", "15:15"];
-  const SLOT_END = ["10:00", "12:00", "15:00", "17:00"];
-  const toIcsDate = (dateStr, timeStr) => {
-    const [y, m, d] = dateStr.split("-");
-    const [h, mi] = timeStr.split(":");
-    return `${y}${m}${d}T${pad(h)}${pad(mi)}00`;
-  };
+  return events;
+}
+function eventTitle(e) {
+  return `${e.course} (${e.role ? (e.role === "curious" ? "Curious Student" : "Interviewer") : "Observing " + e.targetName})`;
+}
+function eventLabel(e) {
+  const roleLabel = e.role ? (e.role === "curious" ? "Curious Student" : "Interviewer") : `Observing ${e.targetName}`;
+  return `${e.course} — ${roleLabel} · ${fmtDay(e.date)} · ${SLOT_TIMES[e.slot]}`;
+}
+function toIcsDate(dateStr, timeStr) {
+  const [y, m, d] = dateStr.split("-");
+  const [h, mi] = timeStr.split(":");
+  return `${y}${m}${d}T${h.padStart(2, "0")}${mi.padStart(2, "0")}00`;
+}
+function buildIcs(events) {
   let ics = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//VagaFraga//EN\n";
   events.forEach((e, i) => {
     ics += "BEGIN:VEVENT\n";
     ics += `UID:vagafraga-${slugify(currentName)}-${i}@vagafraga\n`;
     ics += `DTSTART:${toIcsDate(e.date, SLOT_START[e.slot])}\n`;
     ics += `DTEND:${toIcsDate(e.date, SLOT_END[e.slot])}\n`;
-    ics += `SUMMARY:${e.course} (${e.role ? (e.role === "curious" ? "Curious Student" : "Interviewer") : "Observing " + e.targetName})\n`;
+    ics += `SUMMARY:${eventTitle(e)}\n`;
     ics += "END:VEVENT\n";
   });
   ics += "END:VCALENDAR\n";
   return ics;
 }
+// Opens Google Calendar directly with the event pre-filled — as close to
+// a one-click "add to my calendar" as a static page can offer without a
+// backend OAuth integration. The .ics download remains as the fallback
+// for anyone on a different calendar provider.
+function gcalUrl(e) {
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: eventTitle(e),
+    dates: `${toIcsDate(e.date, SLOT_START[e.slot])}/${toIcsDate(e.date, SLOT_END[e.slot])}`,
+    details: `VågaFråga registration for ${currentName}`
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => toast("Copied to clipboard."),
+      () => fallbackCopy(text)
+    );
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+  document.body.removeChild(ta);
+  toast(ok ? "Copied to clipboard." : "Couldn't copy automatically — please select and copy the text below.");
+}
 function showApprovalConfirmation() {
   const text = buildSummaryText();
+  const events = collectEvents();
   const overlay = document.getElementById("dialogOverlay");
   const box = document.getElementById("dialogBox");
+  const eventsHtml = events.map(e => `
+    <div class="ics-event-row">
+      <span>${eventLabel(e)}</span>
+      <a href="${gcalUrl(e)}" target="_blank" rel="noopener" class="gcal-link">+ Google Calendar</a>
+    </div>
+  `).join("");
   box.innerHTML = `
     <p>The information below was recorded about you. You may come back later and modify it if you use the same name. Please note the assignment details yourself — we do not collect email addresses here, so we are not able to send you reminders or notifications.</p>
-    <div style="display:flex; gap:8px; margin:10px 0;">
+    <div style="display:flex; gap:8px; margin:10px 0; flex-wrap:wrap;">
       <button id="copyBtn" type="button">Copy</button>
       <button id="emailBtn" type="button">E-mail</button>
-      <button id="icsBtn" type="button">Add to calendar</button>
+      <button id="icsBtn" type="button">Download .ics (all events)</button>
     </div>
+    ${events.length ? `<div class="ics-events">${eventsHtml}</div>` : ""}
     <pre style="white-space:pre-wrap; background:#f5f5f5; padding:10px; border-radius:6px; font-size:12px;">${text}</pre>
     <button id="closeConfirmBtn" type="button">Close</button>
   `;
   overlay.classList.remove("hidden");
-  document.getElementById("copyBtn").addEventListener("click", () => {
-    navigator.clipboard.writeText(text).then(() => toast("Copied to clipboard."));
-  });
+  document.getElementById("copyBtn").addEventListener("click", () => copyText(text));
   document.getElementById("emailBtn").addEventListener("click", () => {
-    window.location.href = `mailto:?subject=${encodeURIComponent("My VågaFråga registration")}&body=${encodeURIComponent(text)}`;
+    const a = document.createElement("a");
+    a.href = `mailto:?subject=${encodeURIComponent("My VågaFråga registration")}&body=${encodeURIComponent(text)}`;
+    a.click();
+    toast("Opening your email client — if nothing opens, your browser may not have one set as default. Try Copy instead.");
   });
   document.getElementById("icsBtn").addEventListener("click", () => {
-    const blob = new Blob([buildIcs()], { type: "text/calendar" });
+    const blob = new Blob([buildIcs(events)], { type: "text/calendar" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "vagafraga.ics"; a.click();

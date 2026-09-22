@@ -10,8 +10,6 @@
 
 <header id="header">
   <div class="name-row">
-    <button id="undoLastBtn" type="button" class="undo-btn" title="Undo last: reverses your most recent calendar selection, one step at a time.">↶</button>
-    <button id="undoAllBtn" type="button" class="undo-btn" title="Undo all: restores your calendar selections to how they were when you logged in (or clears them, if this is your first time).">⏮</button>
     <label for="nameInput">Your name:</label>
     <input id="nameInput" type="text" autocomplete="off" placeholder="e.g. Alex Karlsson" />
     <button id="privacyBtn" type="button">Privacy disclaimer</button>
@@ -103,7 +101,15 @@
     </div>
 
     <aside class="summary-panel">
-      <h3>Your selections</h3>
+      <h3>
+        <span class="undo-wrap" title="Undo last: reverses your most recent calendar selection, one step at a time.">
+          <button id="undoLastBtn" type="button" class="undo-btn">↶</button>
+        </span>
+        <span class="undo-wrap" title="Undo all: restores your calendar selections to how they were when you logged in (or clears them, if this is your first time).">
+          <button id="undoAllBtn" type="button" class="undo-btn">⏮</button>
+        </span>
+        Your selections
+      </h3>
       <div id="summaryActive" class="summary-block"></div>
       <div id="summaryObservations" class="summary-block"></div>
       <p class="approve-note"><span class="approve-note-warn">Check against the actual TimeEdit schedule that the times are right</span>, then click Approve.</p>
