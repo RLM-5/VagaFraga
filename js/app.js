@@ -594,7 +594,7 @@ function computeBoxesForDate(tabNum, date, slot) {
     if (tabNum === 1) {
       const role = document.querySelector('input[name="tab1role"]:checked').value;
       const oppositeRole = role === "curious" ? "interviewer" : "curious";
-      const mineOccupant = session[role] && session[role].uid === myUid;
+      const mineOccupant = session[role] && session[role].slug === currentSlug;
       const occupiedBySame = session[role] && !mineOccupant;
       const occupiedByOpposite = !!session[oppositeRole];
       let tier, clickable, explain = null;
@@ -730,7 +730,7 @@ function showActiveLockedDialog() {
   showConfirmDialog({ text: document.getElementById("lockedNotice").innerHTML, buttons: [{ label: "OK", action: () => {} }] });
 }
 function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count) {
-  if (occupant.uid === myUid) { toast("You cannot observe yourself."); return; }
+  if (occupant.slug === currentSlug) { toast("You cannot observe yourself."); return; }
   const key = `${course}_${date}_${slot}`;
   const idx = draftObservations.findIndex(o => keyOf(o) === key && o.targetRole === targetRole);
   if (idx >= 0) {
@@ -938,13 +938,13 @@ async function approveSelections() {
     if (origState.active) {
       const k = keyOf(origState.active);
       const s = sessionData[k];
-      if (s[origState.active.role] && s[origState.active.role].uid === myUid) s[origState.active.role] = null;
+      if (s[origState.active.role] && s[origState.active.role].slug === slug) s[origState.active.role] = null;
     }
     if (draftActive) {
       const k = keyOf(draftActive);
       const s = sessionData[k];
-      if (s[draftActive.role] && s[draftActive.role].uid !== myUid) throw new Error("CONFLICT_ACTIVE");
-      s[draftActive.role] = { name: nameSnapshot, uid: myUid };
+      if (s[draftActive.role] && s[draftActive.role].slug !== slug) throw new Error("CONFLICT_ACTIVE");
+      s[draftActive.role] = { name: nameSnapshot, uid: myUid, slug };
     }
     const origRole = origState.active ? origState.active.role : null;
     const draftRole = draftActive ? draftActive.role : null;
@@ -958,7 +958,7 @@ async function approveSelections() {
       if (!stillThere) {
         const k = keyOf(o); const s = sessionData[k];
         const arr = s[o.targetRole + "Observers"] || [];
-        s[o.targetRole + "Observers"] = arr.filter(x => x.uid !== myUid);
+        s[o.targetRole + "Observers"] = arr.filter(x => x.slug !== slug);
       }
     }
     for (const o of draftObservations) {
@@ -966,9 +966,9 @@ async function approveSelections() {
       if (!wasThere) {
         const k = keyOf(o); const s = sessionData[k];
         const arr = s[o.targetRole + "Observers"] || [];
-        if (!arr.some(x => x.uid === myUid)) {
+        if (!arr.some(x => x.slug === slug)) {
           if (arr.length >= MAX_OBSERVERS) throw new Error("CONFLICT_OBSERVER");
-          s[o.targetRole + "Observers"] = [...arr, { name: nameSnapshot, uid: myUid }];
+          s[o.targetRole + "Observers"] = [...arr, { name: nameSnapshot, uid: myUid, slug }];
         }
       }
     }
