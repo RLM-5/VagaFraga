@@ -91,26 +91,44 @@ def is_group_code(part):
     return False
 
 
+# Some sessions are jointly taught under two course names at once — the
+# raw SUMMARY lists both, back to back, before the activity type. Rather
+# than guess which one "wins" for an unfamiliar combination, only the
+# pairs below are resolved automatically (to the name on the right);
+# anything else is reported and dropped so a human decides.
+JOINT_RESOLUTIONS = {
+    frozenset({
+        "Introductory Course for the Mathematical Physics Specialisation",
+        "Introductory Course for the Master Programme in Physics",
+    }): "Introductory Course for the Master Programme in Physics",
+}
+
+
 def parse_summary(raw_summary):
     parts = [p.strip() for p in raw_summary.split(ESCAPED_COMMA)]
     idx = 0
     while idx < len(parts) and is_group_code(parts[idx]):
         idx += 1
-    name_parts = []
+    names = []
+    cur_name_parts = []
     while idx < len(parts):
         part = parts[idx]
-        name_parts.append(part)
-        idx += 1
-        if part.rstrip().endswith(".") or part in KNOWN_ACTIVITIES:
+        if part in KNOWN_ACTIVITIES:
             break
-    activity = None
-    if name_parts and name_parts[-1] in KNOWN_ACTIVITIES:
-        activity = name_parts.pop()
-    course_name = re.sub(r"\.\s*$", "", ", ".join(name_parts)).strip()
-    rest = parts[idx:]
-    if activity is None:
-        activity = rest[0] if rest else None
-    return course_name, activity
+        cur_name_parts.append(part)
+        idx += 1
+        if part.rstrip().endswith("."):
+            names.append(re.sub(r"\.\s*$", "", ", ".join(cur_name_parts)).strip())
+            cur_name_parts = []
+    activity = parts[idx] if idx < len(parts) else None
+
+    if len(names) <= 1:
+        course_name = names[0] if names else ""
+    elif frozenset(names) in JOINT_RESOLUTIONS:
+        course_name = JOINT_RESOLUTIONS[frozenset(names)]
+    else:
+        course_name = None  # unrecognized joint combo — caller reports it
+    return course_name, activity, names
 
 
 def to_local(dtstr):
@@ -135,6 +153,7 @@ def main():
     catalog_by_name = load_catalog(args.catalog)
 
     unmatched_names = set()
+    unresolved_joints = set()
     dropped_slot = []
     schedule_keys = {}   # (code, date, slot) -> {course,date,slot,type}
     used_courses = {}    # code -> name
@@ -142,8 +161,11 @@ def main():
     for e in events:
         if "DTSTART" not in e or "DTEND" not in e or "T" not in e["DTSTART"]:
             continue
-        name, activity = parse_summary(e.get("SUMMARY", ""))
+        name, activity, all_names = parse_summary(e.get("SUMMARY", ""))
         if activity not in KEEP_ACTIVITIES:
+            continue
+        if name is None:
+            unresolved_joints.add(tuple(all_names))
             continue
 
         start = to_local(e["DTSTART"])
@@ -179,6 +201,10 @@ def main():
     (out_dir / "schedule.json").write_text(json.dumps(schedule_out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     print(f"Wrote {len(courses_out)} courses and {len(schedule_out)} sessions to {out_dir}")
+    if unresolved_joints:
+        print(f"\n{len(unresolved_joints)} unrecognized joint-course combination(s) — not included, add to JOINT_RESOLUTIONS:")
+        for names in sorted(unresolved_joints):
+            print("  - " + "  +  ".join(names))
     if unmatched_names:
         print(f"\n{len(unmatched_names)} course name(s) had NO catalog match — not included, check by hand:")
         for n in sorted(unmatched_names):
@@ -187,7 +213,7 @@ def main():
         print(f"\n{len(dropped_slot)} kept-type session(s) fell outside the 4 fixed daily slots — dropped:")
         for date_str, pair, activity, name in dropped_slot:
             print(f"  - {date_str} {pair[0]}-{pair[1]}  [{activity}]  {name}")
-    if not unmatched_names and not dropped_slot:
+    if not unresolved_joints and not unmatched_names and not dropped_slot:
         print("No unmatched courses, no dropped sessions.")
 
 

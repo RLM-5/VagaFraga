@@ -24,6 +24,12 @@
     "type": "Lecture"
   },
   {
+    "course": "1FA002",
+    "date": "2026-09-21",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
     "course": "1MA531",
     "date": "2026-09-21",
     "slot": 2,
@@ -186,6 +192,12 @@
     "type": "Lesson"
   },
   {
+    "course": "1FA002",
+    "date": "2026-09-24",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
     "course": "1FA164",
     "date": "2026-09-24",
     "slot": 2,
@@ -342,6 +354,12 @@
     "type": "Lecture"
   },
   {
+    "course": "1FA002",
+    "date": "2026-09-29",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
     "course": "1FA033",
     "date": "2026-09-29",
     "slot": 3,
@@ -498,6 +516,12 @@
     "type": "Lecture"
   },
   {
+    "course": "1FA002",
+    "date": "2026-10-02",
+    "slot": 2,
+    "type": "Lecture"
+  },
+  {
     "course": "1FA252",
     "date": "2026-10-02",
     "slot": 3,
@@ -519,6 +543,12 @@
     "course": "1FA404",
     "date": "2026-10-05",
     "slot": 0,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA002",
+    "date": "2026-10-05",
+    "slot": 1,
     "type": "Lecture"
   },
   {
@@ -711,6 +741,12 @@
     "course": "1MA259",
     "date": "2026-10-09",
     "slot": 1,
+    "type": "Lecture"
+  },
+  {
+    "course": "1FA002",
+    "date": "2026-10-09",
+    "slot": 2,
     "type": "Lecture"
   },
   {
@@ -970,6 +1006,12 @@
     "date": "2026-10-16",
     "slot": 1,
     "type": "Lesson"
+  },
+  {
+    "course": "1FA002",
+    "date": "2026-10-16",
+    "slot": 2,
+    "type": "Lecture"
   },
   {
     "course": "1FA163",
