@@ -799,7 +799,7 @@ const ROLE_EXPLANATIONS = {
     title: "Observer role",
     html: `
       <p>Each student should observe one interviewer and one curious student. We expect that, in turn, every student will be observed by two peers — please try to spread out as observers — but this won't be enforced.</p>
-      <p>As an observer, you attend the session the other student chose for their active role, watch how they carry it out, give them feedback afterward, and reflect on what you saw. Use tabs 2 and 3 for this; tab 4 (Reserved observer) is a fallback for when you can't find a suitable session in either of those.</p>
+      <p>As an observer, you attend the session your peer chose for their active role, watch how it goes, give them feedback afterward, and reflect on what you saw. Use the "Observe curious student" and "Observe interviewer" tabs for this; "Reserved observer" is a fallback for when you can't find a suitable session in either of those.</p>
     `
   }
 };
