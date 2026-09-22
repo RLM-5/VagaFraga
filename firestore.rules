@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Student records. Readable by anyone using the app (needed for the
+    // duplicate-name check and for course/session lookups). Writes are
+    // restricted to the anonymous uid that created the record, so one
+    // student can't edit or delete another's entry.
+    match /students/{slug} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if request.auth != null
+                    && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // Session docs are the shared "who's doing what, when" state that
+    // every visitor needs to read to render the calendar. Writes are
+    // only ever done through the app's transaction logic, gated on the
+    // anonymous uid that owns the corresponding student record.
+    match /sessions/{sessionId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Single counters doc for the active-role balance rule.
+    match /meta/counters {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
