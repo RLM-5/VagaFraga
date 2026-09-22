@@ -998,10 +998,6 @@ function collectEvents() {
 function eventTitle(e) {
   return `${e.course} (${e.role ? (e.role === "curious" ? "Curious Student" : "Interviewer") : "Observing " + e.targetName})`;
 }
-function eventLabel(e) {
-  const roleLabel = e.role ? (e.role === "curious" ? "Curious Student" : "Interviewer") : `Observing ${e.targetName}`;
-  return `${e.course} — ${roleLabel} · ${fmtDay(e.date)} · ${SLOT_TIMES[e.slot]}`;
-}
 function toIcsDate(dateStr, timeStr) {
   const [y, m, d] = dateStr.split("-");
   const [h, mi] = timeStr.split(":");
@@ -1019,19 +1015,6 @@ function buildIcs(events) {
   });
   ics += "END:VCALENDAR\n";
   return ics;
-}
-// Opens Google Calendar directly with the event pre-filled — as close to
-// a one-click "add to my calendar" as a static page can offer without a
-// backend OAuth integration. The .ics download remains as the fallback
-// for anyone on a different calendar provider.
-function gcalUrl(e) {
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: eventTitle(e),
-    dates: `${toIcsDate(e.date, SLOT_START[e.slot])}/${toIcsDate(e.date, SLOT_END[e.slot])}`,
-    details: `VågaFråga registration for ${currentName}`
-  });
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 function copyText(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1061,20 +1044,13 @@ function showApprovalConfirmation() {
   const events = collectEvents();
   const overlay = document.getElementById("dialogOverlay");
   const box = document.getElementById("dialogBox");
-  const eventsHtml = events.map(e => `
-    <div class="ics-event-row">
-      <span>${eventLabel(e)}</span>
-      <a href="${gcalUrl(e)}" target="_blank" rel="noopener" class="gcal-link">+ Google Calendar</a>
-    </div>
-  `).join("");
   box.innerHTML = `
     <p>The information below was recorded about you. You may come back later and modify it if you use the same name. Please note the assignment details yourself — we do not collect email addresses here, so we are not able to send you reminders or notifications.</p>
     <div style="display:flex; gap:8px; margin:10px 0; flex-wrap:wrap;">
       <button id="copyBtn" type="button">Copy</button>
       <button id="emailBtn" type="button">E-mail</button>
-      <button id="icsBtn" type="button">Download .ics (all events)</button>
+      <button id="icsBtn" type="button">Add to calendar</button>
     </div>
-    ${events.length ? `<div class="ics-events">${eventsHtml}</div>` : ""}
     <pre style="white-space:pre-wrap; background:#f5f5f5; padding:10px; border-radius:6px; font-size:12px;">${text}</pre>
     <button id="closeConfirmBtn" type="button">Close</button>
   `;
@@ -1087,11 +1063,16 @@ function showApprovalConfirmation() {
     toast("Opening your email client — if nothing opens, your browser may not have one set as default. Try Copy instead.");
   });
   document.getElementById("icsBtn").addEventListener("click", () => {
+    // No .download attribute on purpose: that forces a save-as-file in
+    // every browser. Left as a plain navigation, browsers that know what
+    // to do with a calendar file (Safari, for one) hand it straight to
+    // whatever calendar app is registered on the device instead of
+    // downloading it — there's no third-party calendar service involved
+    // either way, just the file and the OS's own handling of it.
     const blob = new Blob([buildIcs(events)], { type: "text/calendar" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "vagafraga.ics"; a.click();
-    URL.revokeObjectURL(url);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   });
   document.getElementById("closeConfirmBtn").addEventListener("click", () => overlay.classList.add("hidden"));
 }
