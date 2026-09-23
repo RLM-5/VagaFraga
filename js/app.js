@@ -61,6 +61,21 @@ function emptySession(key) {
   const [course, date, slot] = key.split("_");
   return { course, date, slot: Number(slot), weekStart: mondayOf(date), curious: null, interviewer: null, curiousObservers: [], interviewerObservers: [] };
 }
+// Used only to detect whether another window/device changed this student's own
+// record between when this window last loaded it and when it's about to save —
+// never for anything session-occupancy-related (that's always diffed against a
+// fresh read inside the transaction, see approveSelections()).
+function sameActive(a, b) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return a.course === b.course && a.date === b.date && a.slot === b.slot && a.role === b.role;
+}
+function sameObservations(a, b) {
+  if (a.length !== b.length) return false;
+  const keyer = o => `${o.course}_${o.date}_${o.slot}_${o.targetRole}`;
+  const as = new Set(a.map(keyer));
+  return b.every(o => as.has(keyer(o)));
+}
 
 /* ================================================================
    Unified student state
@@ -1064,8 +1079,8 @@ function wireApprove() {
 async function onApprove() {
   if (!nameConfirmed) { toast("Please enter and confirm your name first."); return; }
   try {
-    await approveSelections();
-    showApprovalConfirmation();
+    const { staleAtStart } = await approveSelections();
+    showApprovalConfirmation(staleAtStart);
   } catch (err) {
     let text;
     if (err.message === "CONFLICT_ACTIVE") text = "Someone else just took that active-role slot while you were choosing. Nothing was saved — please review your selection and pick another slot.";
@@ -1084,11 +1099,26 @@ async function approveSelections() {
   const newActive = draftState.active;
   const newObservations = draftState.observations;
 
-  await runTransaction(db, async (tx) => {
+  // The diff of "what to clear" is always built from a FRESH read of this
+  // student's own doc inside the transaction, never from the client's
+  // cached origState. If another window/tab/device under the same name
+  // approved something in between, origState here can be stale — diffing
+  // against it would only clear the session slots *this* client remembers,
+  // leaving whatever the other window touched permanently orphaned as a
+  // "ghost" occupant that blocks the slot for everyone else forever.
+  // Reading fresh here makes the transaction self-correcting regardless of
+  // how stale the client's view is.
+  const { staleAtStart } = await runTransaction(db, async (tx) => {
+    const studentRef = doc(db, "students", slug);
+    const studentSnap = await tx.get(studentRef);
+    const serverData = studentSnap.exists() ? studentSnap.data() : null;
+    const serverActive = serverData ? (serverData.active || null) : null;
+    const serverObservations = serverData ? (serverData.observations || []) : [];
+
     const touchedKeys = new Set();
-    if (origState.active) touchedKeys.add(keyOf(origState.active));
+    if (serverActive) touchedKeys.add(keyOf(serverActive));
     if (newActive) touchedKeys.add(keyOf(newActive));
-    origState.observations.forEach(o => touchedKeys.add(keyOf(o)));
+    serverObservations.forEach(o => touchedKeys.add(keyOf(o)));
     newObservations.forEach(o => touchedKeys.add(keyOf(o)));
 
     const sessionRefs = {}; const sessionData = {};
@@ -1102,10 +1132,10 @@ async function approveSelections() {
     const counterSnap = await tx.get(counterRef);
     const cnt = counterSnap.exists() ? counterSnap.data() : { curiousCount: 0, interviewerCount: 0 };
 
-    if (origState.active) {
-      const k = keyOf(origState.active);
+    if (serverActive) {
+      const k = keyOf(serverActive);
       const s = sessionData[k];
-      if (s[origState.active.role] && occupantSlug(s[origState.active.role]) === slug) s[origState.active.role] = null;
+      if (s[serverActive.role] && occupantSlug(s[serverActive.role]) === slug) s[serverActive.role] = null;
     }
     if (newActive) {
       const k = keyOf(newActive);
@@ -1113,14 +1143,14 @@ async function approveSelections() {
       if (s[newActive.role] && occupantSlug(s[newActive.role]) !== slug) throw new Error("CONFLICT_ACTIVE");
       s[newActive.role] = { name: nameSnapshot, uid: myUid, slug };
     }
-    const origRole = origState.active ? origState.active.role : null;
+    const serverRole = serverActive ? serverActive.role : null;
     const draftRole = newActive ? newActive.role : null;
-    if (origRole !== draftRole) {
-      if (origRole) cnt[origRole + "Count"] = Math.max(0, (cnt[origRole + "Count"] || 0) - 1);
+    if (serverRole !== draftRole) {
+      if (serverRole) cnt[serverRole + "Count"] = Math.max(0, (cnt[serverRole + "Count"] || 0) - 1);
       if (draftRole) cnt[draftRole + "Count"] = (cnt[draftRole + "Count"] || 0) + 1;
     }
 
-    for (const o of origState.observations) {
+    for (const o of serverObservations) {
       const stillThere = newObservations.some(d => keyOf(d) === keyOf(o) && d.targetRole === o.targetRole);
       if (!stillThere) {
         const k = keyOf(o); const s = sessionData[k];
@@ -1129,7 +1159,7 @@ async function approveSelections() {
       }
     }
     for (const o of newObservations) {
-      const wasThere = origState.observations.some(x => keyOf(x) === keyOf(o) && x.targetRole === o.targetRole);
+      const wasThere = serverObservations.some(x => keyOf(x) === keyOf(o) && x.targetRole === o.targetRole);
       if (!wasThere) {
         const k = keyOf(o); const s = sessionData[k];
         const arr = s[o.targetRole + "Observers"] || [];
@@ -1142,11 +1172,17 @@ async function approveSelections() {
 
     for (const k of touchedKeys) tx.set(sessionRefs[k], sessionData[k]);
     tx.set(counterRef, cnt);
-    tx.set(doc(db, "students", slug), {
+    tx.set(studentRef, {
       name: nameSnapshot, nameLower: nameSnapshot.toLowerCase(), ownerUid: myUid,
       active: newActive, observations: newObservations,
-      createdAt: origState.createdAt || serverTimestamp(), updatedAt: serverTimestamp()
+      createdAt: (serverData && serverData.createdAt) || origState.createdAt || serverTimestamp(), updatedAt: serverTimestamp()
     });
+
+    // Only true when the server's state differs from what THIS window last
+    // knew *before this save* — i.e. something else changed it in between.
+    // A normal single-window approve always finds them equal, since this
+    // window's own prior approve is what last set origState.
+    return { staleAtStart: !sameActive(origState.active, serverActive) || !sameObservations(origState.observations, serverObservations) };
   });
 
   origState = { active: newActive, observations: [...newObservations], createdAt: origState.createdAt || new Date() };
@@ -1154,6 +1190,7 @@ async function approveSelections() {
   updateUndoButtons();
   await refreshActiveLock();
   refreshCourseScopedCounts();
+  return { staleAtStart };
 }
 
 /* ---------------- confirmation banner (copy / email / ics) ---------------- */
@@ -1243,13 +1280,17 @@ function addToCalendar(events) {
     toast("A calendar file was downloaded — open it to add these events to your calendar app.");
   }
 }
-function showApprovalConfirmation() {
+function showApprovalConfirmation(staleAtStart) {
   const text = buildSummaryText();
   const events = collectEvents();
   const overlay = document.getElementById("dialogOverlay");
   const box = document.getElementById("dialogBox");
+  const staleNotice = staleAtStart
+    ? `<p style="background:#fff6e0; border:1px solid #e6c766; padding:8px 12px; border-radius:6px;">Note: your saved selections had already changed since this page loaded them — most likely you (or someone using your name) have this open in another window, tab, or device. What you just submitted was saved on top of that latest data. Please double-check the summary below is what you intended.</p>`
+    : "";
   box.innerHTML = `
     <p>The information below was recorded about you. You may come back later and modify it if you use the same name. Please note the assignment details yourself — we do not collect email addresses here, so we are not able to send you reminders or notifications.</p>
+    ${staleNotice}
     <div style="display:flex; gap:8px; margin:10px 0; flex-wrap:wrap;">
       <button id="copyBtn" type="button">Copy</button>
       <button id="emailBtn" type="button">E-mail</button>
