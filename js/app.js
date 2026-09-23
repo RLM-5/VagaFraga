@@ -49,6 +49,13 @@ function slugify(name) {
   s = s.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return s;
 }
+// Records written before the slug field existed only have `name`/`uid`.
+// Deriving it from the stored name here means an identity comparison can
+// never silently fail against old data — no migration required, and any
+// future field we forget to backfill fails the same safe way.
+function occupantSlug(occupant) {
+  return occupant.slug || slugify(occupant.name || "");
+}
 function keyOf(entry) { return `${entry.course}_${entry.date}_${entry.slot}`; }
 function emptySession(key) {
   const [course, date, slot] = key.split("_");
@@ -594,7 +601,7 @@ function computeBoxesForDate(tabNum, date, slot) {
     if (tabNum === 1) {
       const role = document.querySelector('input[name="tab1role"]:checked').value;
       const oppositeRole = role === "curious" ? "interviewer" : "curious";
-      const mineOccupant = session[role] && session[role].slug === currentSlug;
+      const mineOccupant = session[role] && occupantSlug(session[role]) === currentSlug;
       const occupiedBySame = session[role] && !mineOccupant;
       const occupiedByOpposite = !!session[oppositeRole];
       let tier, clickable, explain = null;
@@ -760,7 +767,7 @@ async function onTab1RoleChange(radioEl) {
     return;
   }
   const occupant = session[newRole];
-  if (occupant && occupant.slug !== currentSlug) {
+  if (occupant && occupantSlug(occupant) !== currentSlug) {
     revertRadio();
     showConfirmDialog({
       text: `Can't switch to ${newRole === "curious" ? "Curious Student" : "Interviewer"} for your selected session (${draftActive.course}) — that role there is already taken. Pick a different session for ${newRole === "curious" ? "Curious Student" : "Interviewer"} instead, or keep your current selection.`,
@@ -775,7 +782,7 @@ async function onTab1RoleChange(radioEl) {
   updateUndoButtons();
 }
 function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count) {
-  if (occupant.slug === currentSlug) { toast("You cannot observe yourself."); return; }
+  if (occupantSlug(occupant) === currentSlug) { toast("You cannot observe yourself."); return; }
   const key = `${course}_${date}_${slot}`;
   const idx = draftObservations.findIndex(o => keyOf(o) === key && o.targetRole === targetRole);
   if (idx >= 0) {
@@ -1007,12 +1014,12 @@ async function approveSelections() {
     if (origState.active) {
       const k = keyOf(origState.active);
       const s = sessionData[k];
-      if (s[origState.active.role] && s[origState.active.role].slug === slug) s[origState.active.role] = null;
+      if (s[origState.active.role] && occupantSlug(s[origState.active.role]) === slug) s[origState.active.role] = null;
     }
     if (draftActive) {
       const k = keyOf(draftActive);
       const s = sessionData[k];
-      if (s[draftActive.role] && s[draftActive.role].slug !== slug) throw new Error("CONFLICT_ACTIVE");
+      if (s[draftActive.role] && occupantSlug(s[draftActive.role]) !== slug) throw new Error("CONFLICT_ACTIVE");
       s[draftActive.role] = { name: nameSnapshot, uid: myUid, slug };
     }
     const origRole = origState.active ? origState.active.role : null;
@@ -1027,7 +1034,7 @@ async function approveSelections() {
       if (!stillThere) {
         const k = keyOf(o); const s = sessionData[k];
         const arr = s[o.targetRole + "Observers"] || [];
-        s[o.targetRole + "Observers"] = arr.filter(x => x.slug !== slug);
+        s[o.targetRole + "Observers"] = arr.filter(x => occupantSlug(x) !== slug);
       }
     }
     for (const o of draftObservations) {
@@ -1035,7 +1042,7 @@ async function approveSelections() {
       if (!wasThere) {
         const k = keyOf(o); const s = sessionData[k];
         const arr = s[o.targetRole + "Observers"] || [];
-        if (!arr.some(x => x.slug === slug)) {
+        if (!arr.some(x => occupantSlug(x) === slug)) {
           if (arr.length >= MAX_OBSERVERS) throw new Error("CONFLICT_OBSERVER");
           s[o.targetRole + "Observers"] = [...arr, { name: nameSnapshot, uid: myUid, slug }];
         }
