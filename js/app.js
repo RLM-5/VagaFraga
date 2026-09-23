@@ -41,6 +41,21 @@ function isoWeek(dateStr) {
 }
 function fmtDay(dateStr) { const d = toDate(dateStr); return `${d.getDate()}/${d.getMonth() + 1}`; }
 
+// Every value that ends up inside an innerHTML template and did not
+// originate as a hardcoded string in this file — a student's own name, an
+// observed student's name, a locked session's observer names, a course name
+// someone added via "+ Add another course" — must go through this first.
+// Course *codes* are already restricted to [A-Z0-9] at submission time, but
+// they're escaped here too for defense in depth rather than relying on that.
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /* ---------------- slug ---------------- */
 const DIACRITIC_MAP = { å: "a", ä: "a", ö: "o", é: "e", è: "e", ü: "u", ï: "i", ø: "o", ñ: "n", ß: "ss" };
 function slugify(name) {
@@ -266,7 +281,7 @@ function courseRow(c, onToggle) {
   cb.checked = draftState.selectedCourses.has(c.code);
   cb.addEventListener("change", onToggle);
   const label = document.createElement("span");
-  label.innerHTML = `<span class="course-code">${c.code}</span> — ${c.name}`;
+  label.innerHTML = `<span class="course-code">${escapeHtml(c.code)}</span> — ${escapeHtml(c.name)}`;
   li.appendChild(cb);
   li.appendChild(label);
   return li;
@@ -426,7 +441,7 @@ function renderAddCourseCalendar() {
       if (idx >= 0) {
         const p = pendingInstances[idx];
         box.className = "box tier-green clickable selected";
-        box.innerHTML = `<span class="code" style="font-size:11px">${p.type}</span><span class="type" style="font-size:10px">click to remove</span>`;
+        box.innerHTML = `<span class="code" style="font-size:11px">${escapeHtml(p.type)}</span><span class="type" style="font-size:10px">click to remove</span>`;
         box.addEventListener("click", () => { pendingInstances.splice(idx, 1); renderAddCourseCalendar(); });
       } else {
         box.className = "box add-slot-placeholder clickable";
@@ -532,9 +547,9 @@ function showDuplicateBanner(existingData) {
   // it reads as "these two names count as the same" rather than a glitch
   // showing someone else's name back at the student.
   const sameText = existingData.name === currentName;
-  const collisionNote = sameText ? "" : `<p>You typed "${currentName}" — this app treats it as the same identity as the name already on record below, since it simplifies to the same internal identifier (spacing, capitalization, and accents are ignored).</p>`;
+  const collisionNote = sameText ? "" : `<p>You typed "${escapeHtml(currentName)}" — this app treats it as the same identity as the name already on record below, since it simplifies to the same internal identifier (spacing, capitalization, and accents are ignored).</p>`;
   banner.innerHTML = `
-    <p>The name "${existingData.name}" has already been used — registered for ${roleSummaryText(existingData)}.</p>
+    <p>The name "${escapeHtml(existingData.name)}" has already been used — registered for ${roleSummaryText(existingData)}.</p>
     ${collisionNote}
     <p>If you recognize this as you, please proceed. Otherwise, cancel and choose a name that's more clearly different.</p>
     <button id="dupProceedBtn" type="button">Proceed — this is me</button>
@@ -604,7 +619,7 @@ async function refreshActiveLock() {
     activeLocked = true;
     activeLockObservers = observers.map(o => o.name);
     notice.classList.remove("hidden");
-    notice.innerHTML = `You already have observers assigned to your current active-role session (${origState.active.course}): <strong>${activeLockObservers.join(", ")}</strong>. If you want to change your active role, you need to speak with them first so they can unselect — this cannot be changed here.`;
+    notice.innerHTML = `You already have observers assigned to your current active-role session (${escapeHtml(origState.active.course)}): <strong>${activeLockObservers.map(escapeHtml).join(", ")}</strong>. If you want to change your active role, you need to speak with them first so they can unselect — this cannot be changed here.`;
   }
 }
 
@@ -786,7 +801,7 @@ function renderBox(b, dims) {
   div.dataset.slot = b.slot;
   div.dataset.role = b.role;
   const fs = fontSizesFor(dims.rows || 1);
-  div.innerHTML = `<span class="code" style="font-size:${fs.code}px">${b.course}</span><span class="type" style="font-size:${fs.type}px">${b.type}</span>` +
+  div.innerHTML = `<span class="code" style="font-size:${fs.code}px">${escapeHtml(b.course)}</span><span class="type" style="font-size:${fs.type}px">${escapeHtml(b.type)}</span>` +
     (b.badge != null ? `<span class="badge" style="font-size:${fs.badge}px">${b.badge}</span>` : "");
   if (b.clickable && b.onClick) {
     div.addEventListener("click", b.onClick);
@@ -938,12 +953,14 @@ function fmtEntry(course, date, slot) {
   const dow = DAY_NAMES[(toDate(date).getDay() + 6) % 7];
   return `${course} — ${c ? c.name : ""} · ${dow} ${fmtDay(date)} · ${SLOT_TIMES[slot]}`;
 }
+// roleLabel is passed in pre-escaped by every call site below (it's the one
+// piece here that can carry another student's name, e.g. "Observing: ...").
 function entryBlock(roleLabel, course, date, slot) {
   const c = COURSES.find(x => x.code === course);
   const dow = DAY_NAMES[(toDate(date).getDay() + 6) % 7];
   return `<div class="entry">
     <span class="line-role">${roleLabel}</span>
-    <span class="line-course">${course} — ${c ? c.name : ""}</span>
+    <span class="line-course">${escapeHtml(course)} — ${c ? escapeHtml(c.name) : ""}</span>
     <span class="line-day">${dow} ${fmtDay(date)}</span>
     <span class="line-time">${SLOT_TIMES[slot]}</span>
   </div>`;
@@ -957,7 +974,7 @@ function renderSummary() {
   obsEl.innerHTML = "<strong>Observer roles</strong><br>"
     + `<p class="hint">You don't have to add these now — you can come back later and enter the same name to add them.</p>`
     + (draftState.observations.length
-      ? draftState.observations.map(o => entryBlock(`Observing: ${o.targetName} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}")`, o.course, o.date, o.slot)).join("")
+      ? draftState.observations.map(o => entryBlock(`Observing: ${escapeHtml(o.targetName)} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}")`, o.course, o.date, o.slot)).join("")
       : `<div class="entry">No observer roles selected yet.</div>`);
 }
 function flashSummary() {
@@ -1304,7 +1321,7 @@ function showApprovalConfirmation(staleAtStart) {
       <button id="emailBtn" type="button">E-mail</button>
       <button id="icsBtn" type="button">Add to calendar</button>
     </div>
-    <pre style="white-space:pre-wrap; background:#f5f5f5; padding:10px; border-radius:6px; font-size:12px;">${text}</pre>
+    <pre style="white-space:pre-wrap; background:#f5f5f5; padding:10px; border-radius:6px; font-size:12px;">${escapeHtml(text)}</pre>
     <button id="closeConfirmBtn" type="button">Close</button>
   `;
   overlay.classList.remove("hidden");
