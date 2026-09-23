@@ -526,9 +526,17 @@ function showDuplicateBanner(existingData) {
   document.getElementById("confirmBanner").classList.add("hidden");
   const banner = document.getElementById("duplicateBanner");
   banner.classList.remove("hidden");
+  // Identity is by slug, not exact text — two visibly different names (extra
+  // space, different capitalization, "å" vs "a", ...) can collide on the same
+  // slug. When that's happened, say so explicitly and show both strings, so
+  // it reads as "these two names count as the same" rather than a glitch
+  // showing someone else's name back at the student.
+  const sameText = existingData.name === currentName;
+  const collisionNote = sameText ? "" : `<p>You typed "${currentName}" — this app treats it as the same identity as the name already on record below, since it simplifies to the same internal identifier (spacing, capitalization, and accents are ignored).</p>`;
   banner.innerHTML = `
     <p>The name "${existingData.name}" has already been used — registered for ${roleSummaryText(existingData)}.</p>
-    <p>If you recognize this as you, please proceed. Otherwise, cancel and choose a different name.</p>
+    ${collisionNote}
+    <p>If you recognize this as you, please proceed. Otherwise, cancel and choose a name that's more clearly different.</p>
     <button id="dupProceedBtn" type="button">Proceed — this is me</button>
     <button id="dupCancelBtn" type="button">Cancel</button>
   `;
