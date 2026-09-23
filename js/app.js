@@ -817,8 +817,13 @@ function computeBoxesForDate(tabNum, date, slot) {
       const alreadyMine = draftState.observations.some(o => keyOf(o) === key && o.targetRole === targetRole);
       let tier, clickable, explain = null;
       if (count >= MAX_OBSERVERS) {
-        tier = "tier-red"; clickable = false;
-        explain = `This ${targetRole === "curious" ? "curious student" : "interviewer"} already has ${count} observers. Please pick a different session to observe.`;
+        tier = "tier-red";
+        // Removing your own observation only ever brings the count down, so
+        // it stays clickable even at the cap — otherwise a student who's
+        // already one of the 3 observers here could never cancel through
+        // this box once a 4th person's attempt (correctly) never got in.
+        clickable = alreadyMine;
+        if (!alreadyMine) explain = `This ${targetRole === "curious" ? "curious student" : "interviewer"} already has ${count} observers. Please pick a different session to observe.`;
       } else if (count === 2) { tier = "tier-orange-red"; clickable = true; }
       else if (count === 1) { tier = "tier-green-orange"; clickable = true; }
       else { tier = "tier-green"; clickable = true; }
