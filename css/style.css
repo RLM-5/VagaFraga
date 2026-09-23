@@ -155,6 +155,7 @@ header {
   padding: 14px; font-size: 13px;
 }
 .summary-panel h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; }
+.draft-label { margin: 0 0 10px; font-size: 11px; color: var(--muted); text-align: center; font-style: italic; }
 .summary-block { margin-bottom: 14px; min-height: 20px; }
 .summary-block .hint { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
 .summary-block .entry { padding: 6px 0; border-bottom: 1px solid #eee; line-height: 1.5; }
@@ -231,7 +232,19 @@ header {
 .box.clickable:hover { filter: brightness(0.95); }
 .box.explainable { cursor: help; }
 .box.explainable:hover { filter: brightness(0.95); }
-.box.selected { outline: 3px solid var(--accent); outline-offset: -3px; }
+.box.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+  box-shadow: 0 0 0 1px #fff inset, 0 1px 6px rgba(59,110,165,0.65);
+}
+.box.selected::after {
+  content: "✓";
+  position: absolute; bottom: 1px; right: 2px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 9px; font-weight: 900; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
 .box .code { font-weight: 700; display: block; }
 .box .type { color: rgba(0,0,0,0.65); display: block; }
 .box .badge {

@@ -187,9 +187,33 @@ function courseRow(c, onToggle) {
   li.appendChild(label);
   return li;
 }
+// Unticking a course used to silently wipe any active-role pick or
+// observations tied to it — no feedback, and no check of the same
+// already-has-observers lock that blocks every other way of changing
+// the active role. Now it respects the lock (re-ticking the course
+// rather than dropping a locked pick) and always tells the student
+// what happened.
 function pruneDraftToSelectedCourses() {
-  if (draftActive && !selectedCourses.has(draftActive.course)) draftActive = null;
-  draftObservations = draftObservations.filter(o => selectedCourses.has(o.course));
+  const activeCourseGone = draftActive && !selectedCourses.has(draftActive.course);
+  if (activeCourseGone && activeLocked) selectedCourses.add(draftActive.course);
+  const droppingActive = activeCourseGone && !activeLocked;
+  const keptObservations = draftObservations.filter(o => selectedCourses.has(o.course));
+  const droppedObsCount = draftObservations.length - keptObservations.length;
+
+  if (droppingActive || droppedObsCount > 0) pushHistory();
+  if (droppingActive) draftActive = null;
+  draftObservations = keptObservations;
+  if (droppingActive || droppedObsCount > 0) updateUndoButtons();
+
+  if (activeCourseGone && activeLocked) {
+    showActiveLockedDialog();
+  } else {
+    const parts = [];
+    if (droppingActive) parts.push("your active-role selection");
+    if (droppedObsCount === 1) parts.push("an observation");
+    else if (droppedObsCount > 1) parts.push(`${droppedObsCount} observations`);
+    if (parts.length) toast(`Removed ${parts.join(" and ")} — you unticked its course.`);
+  }
 }
 function toggleCourse(code) {
   if (selectedCourses.has(code)) selectedCourses.delete(code); else selectedCourses.add(code);
@@ -520,6 +544,12 @@ function switchTab(n) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", Number(b.dataset.tab) === n));
   document.querySelectorAll(".tab-content").forEach(el => el.classList.toggle("hidden", el.id !== `tab${n}`));
   renderTab(n);
+  // These two are one-off fetches, not live — refreshing on every tab
+  // switch (cheap: one query, one doc read) keeps them from silently
+  // going stale if another student approved something while you sat on
+  // a different tab, without needing a permanent extra listener.
+  if ([2, 3, 4].includes(n)) refreshCourseScopedCounts();
+  if (n === 1) refreshActiveLock();
 }
 
 // renderTab() calls this on every render, so it must be a no-op when the
@@ -790,7 +820,10 @@ async function onTab1RoleChange(radioEl) {
   updateUndoButtons();
 }
 function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count) {
-  if (occupantSlug(occupant) === currentSlug) { toast("You cannot observe yourself."); return; }
+  if (occupantSlug(occupant) === currentSlug) {
+    showConfirmDialog({ text: "You cannot observe yourself.", buttons: [{ label: "OK", action: () => {} }] });
+    return;
+  }
   const key = `${course}_${date}_${slot}`;
   const idx = draftObservations.findIndex(o => keyOf(o) === key && o.targetRole === targetRole);
   if (idx >= 0) {
@@ -993,9 +1026,11 @@ async function onApprove() {
     await approveSelections();
     showApprovalConfirmation();
   } catch (err) {
-    if (err.message === "CONFLICT_ACTIVE") toast("Someone just took that active-role slot — please pick another.");
-    else if (err.message === "CONFLICT_OBSERVER") toast("That session just reached its observer limit — please pick another.");
-    else { console.error(err); toast("Something went wrong saving your selections. Please try again."); }
+    let text;
+    if (err.message === "CONFLICT_ACTIVE") text = "Someone else just took that active-role slot while you were choosing. Nothing was saved — please review your selection and pick another slot.";
+    else if (err.message === "CONFLICT_OBSERVER") text = "That session just reached its observer limit while you were choosing. Nothing was saved — please review your selection and pick another session to observe.";
+    else { console.error(err); text = "Something went wrong saving your selections — nothing was saved. Please try again."; }
+    showConfirmDialog({ text, buttons: [{ label: "OK", action: () => {} }] });
   }
 }
 async function approveSelections() {
@@ -1070,6 +1105,7 @@ async function approveSelections() {
   historyStack = [];
   updateUndoButtons();
   await refreshActiveLock();
+  refreshCourseScopedCounts();
 }
 
 /* ---------------- confirmation banner (copy / email / ics) ---------------- */
