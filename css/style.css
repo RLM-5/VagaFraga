@@ -170,6 +170,7 @@ header {
   background: var(--accent); color: #fff; border: none; border-radius: 6px;
 }
 #approveBtn:hover { opacity: 0.92; }
+#approveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .tab-buttons { display: flex; gap: 2px; border-bottom: 2px solid var(--border); }
 .tab-btn {

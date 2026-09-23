@@ -239,6 +239,7 @@ async function boot() {
   wireHeader();
   wireTabs();
   wireApprove();
+  wireConnectivity();
   wireAddCourse();
   wireUndo();
   wireExplainButtons();
@@ -1142,8 +1143,27 @@ function toast(msg) {
 function wireApprove() {
   document.getElementById("approveBtn").addEventListener("click", onApprove);
 }
+// navigator.onLine only catches the browser having no network at all (wifi
+// off, airplane mode) — it says nothing about whether Firestore specifically
+// is reachable, so approveSelections()'s own try/catch stays as the real
+// safety net for subtler failures (DNS, a captive portal, Firestore itself
+// being down). This is just the cheap, common case caught before a click
+// instead of after.
+function wireConnectivity() {
+  const approveBtn = document.getElementById("approveBtn");
+  const offlineNote = document.getElementById("offlineNote");
+  const update = () => {
+    const online = navigator.onLine;
+    approveBtn.disabled = !online;
+    offlineNote.classList.toggle("hidden", online);
+  };
+  window.addEventListener("online", update);
+  window.addEventListener("offline", update);
+  update();
+}
 async function onApprove() {
   if (!nameConfirmed) { toast("Please enter and confirm your name first."); return; }
+  if (!navigator.onLine) { toast("You appear to be offline — reconnect before approving."); return; }
   try {
     const { staleAtStart } = await approveSelections();
     showApprovalConfirmation(staleAtStart);
