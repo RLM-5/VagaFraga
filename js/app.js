@@ -1,5 +1,5 @@
 import {
-  db, auth, authReady, doc, getDoc, getDocs, setDoc, runTransaction,
+  db, auth, authReady, authReadyWithin, doc, getDoc, getDocs, setDoc, runTransaction,
   collection, query, where, onSnapshot, serverTimestamp
 } from "./firebase-init.js";
 
@@ -482,7 +482,8 @@ async function submitAddCourse() {
   const existing = COURSES.find(c => c.code.toUpperCase() === code);
   if (!existing && !nameRaw) { toast("Please fill in the course name."); return; }
 
-  await authReady;
+  const connected = await authReadyWithin(8000);
+  if (!connected) { toast("Couldn't reach the server — please check your connection and try again."); return; }
   try {
     if (!existing) {
       await setDoc(doc(db, "customCourses", code), { code, name: nameRaw, addedBy: currentName || "anonymous", createdAt: serverTimestamp() });
@@ -528,7 +529,8 @@ function hideBanners() {
 async function handleNameStabilized(name) {
   const trimmed = name.trim();
   if (!trimmed) return;
-  await authReady;
+  const connected = await authReadyWithin(8000);
+  if (!connected) { toast("Couldn't reach the server — please check your connection and try again."); return; }
   const slug = slugify(trimmed);
   // A blank field staying blank needs no explanation, but text that's
   // visibly there and still resolves to nothing (only punctuation/symbols)
