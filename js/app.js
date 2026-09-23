@@ -62,37 +62,105 @@ function emptySession(key) {
   return { course, date, slot: Number(slot), weekStart: mondayOf(date), curious: null, interviewer: null, curiousObservers: [], interviewerObservers: [] };
 }
 
-/* ---------------- global state ---------------- */
+/* ================================================================
+   Unified student state
+   ================================================================
+   draftState is the ONE object holding everything about "this student,
+   right now": both what eventually gets saved (active, observations)
+   and pure session/UI position (selectedCourses, activeTab, weekByTab,
+   the two tab role choices). origState mirrors only the persisted
+   slice — the last state actually written to Firestore, i.e. what
+   "Undo all" reverts to and what approveSelections() diffs against.
+
+   Every mutation goes through applyToDraft() or setState() below, and
+   both always end in renderApp() — so a screen update can never be
+   forgotten, which is exactly the bug class this replaces.
+   ================================================================ */
+function makeEmptyDraftState() {
+  return {
+    active: null,               // {course, date, slot, role} | null
+    observations: [],           // [{course, date, slot, targetRole, targetName}]
+    selectedCourses: new Set(), // ticked course codes
+    activeTab: 1,                // which of the 4 tabs is open
+    weekByTab: { 1: FIRST_MONDAY, 2: FIRST_MONDAY, 3: FIRST_MONDAY, 4: FIRST_MONDAY },
+    tab1Role: "curious",         // Active-role tab's radio
+    tab4Role: "curious",         // Reserved-observer tab's radio
+  };
+}
+// Building a draft from a loaded student record — the one place a
+// Firestore student doc turns into the shape the rest of the app edits.
+function loadDraftFromSaved(saved) {
+  const state = makeEmptyDraftState();
+  state.active = saved.active ? { ...saved.active } : null;
+  state.observations = (saved.observations || []).map(o => ({ ...o }));
+  state.selectedCourses = new Set([
+    ...(state.active ? [state.active.course] : []),
+    ...state.observations.map(o => o.course)
+  ]);
+  if (state.active) state.tab1Role = state.active.role;
+  return state;
+}
+// The undo history only ever snapshots the "content" portion — active +
+// observations — never navigation (tab, week, search). Undo is about
+// reverting selections, not about where you were looking; course
+// ticking was explicitly scoped out of undo too (see toggleCourse).
+function contentSnapshot(state) {
+  return { active: state.active ? { ...state.active } : null, observations: state.observations.map(o => ({ ...o })) };
+}
+
+let draftState = makeEmptyDraftState();
+let origState = { active: null, observations: [], createdAt: null };
+let historyStack = []; // stack of contentSnapshot()s, for Undo last/all
+
+// The single screen-update entry point. Every render*() function reads
+// only from draftState/origState/module data — nothing else calls them
+// directly outside of this and the one-off async refreshers below.
+function renderApp() {
+  renderCourseLists();
+  if (!nameConfirmed) return;
+  renderTab(draftState.activeTab);
+  renderSummary();
+  updateUndoButtons();
+}
+// Navigation-only change: tab switch, week nav, course ticking, a tab
+// role radio with nothing to swap. Re-renders, but isn't undoable.
+function applyToDraft(mutator) {
+  mutator(draftState);
+  renderApp();
+}
+// A real content change: active-role pick, role swap, observation
+// add/remove/erase. Snapshots the prior content first, so it's undoable.
+function setState(mutator) {
+  historyStack.push(contentSnapshot(draftState));
+  if (historyStack.length > 20) historyStack.shift();
+  applyToDraft(mutator);
+}
+
+/* ---------------- other global state ---------------- */
 let STATIC_COURSES = [];
 let STATIC_SCHEDULE = [];
 let customCourses = new Map();  // code -> {code,name,addedBy}
 let customSchedule = new Map(); // "code_date_slot" -> {course,date,slot,type}
 let COURSES = [];
 let scheduleByDateSlot = new Map(); // "date_slot" -> [{course,type}]
-let selectedCourses = new Set();
 
 let myUid = null;
 let currentName = "";
 let currentSlug = "";
 let nameConfirmed = false;
 
-let origState = { active: null, observations: [], createdAt: null };
-let draftActive = null;
-let draftObservations = [];
 let activeLocked = false;
 let activeLockObservers = [];
 
-let activeTab = 1;
-let weekState = { 1: FIRST_MONDAY, 2: FIRST_MONDAY, 3: FIRST_MONDAY, 4: FIRST_MONDAY };
 let weekSessionsByTab = { 1: new Map(), 2: new Map(), 3: new Map(), 4: new Map() };
 let unsubByTab = { 1: null, 2: null, 3: null, 4: null };
 let subscribedWeekByTab = { 1: null, 2: null, 3: null, 4: null };
 let counters = { curiousCount: 0, interviewerCount: 0 };
 // Counts scoped to the student's currently-ticked courses, refetched
-// whenever the course selection changes — separate from the global
-// `counters` above, which stay global for the tab-1 balance rule.
+// whenever the course selection or active tab changes — separate from
+// the global `counters` above, which stay global for the tab-1 balance
+// rule. Both are one-off fetches, not live (see refresh calls below).
 let courseScopedCounts = { curious: 0, interviewer: 0 };
-let historyStack = []; // stack of {draftActive, draftObservations} snapshots, for Undo
 
 /* ---------------- boot ---------------- */
 // Course/schedule data is the static JSON plus whatever students have
@@ -109,8 +177,7 @@ function rebuildMergedData() {
     if (!scheduleByDateSlot.has(k)) scheduleByDateSlot.set(k, []);
     scheduleByDateSlot.get(k).push(e);
   }
-  renderCourseLists();
-  if (nameConfirmed) renderTab(activeTab);
+  renderApp();
 }
 
 async function boot() {
@@ -131,12 +198,13 @@ async function boot() {
   wireAddCourse();
   wireUndo();
   wireExplainButtons();
+  wireCoursePicker();
 
   authReady.then(u => { myUid = u.uid; });
 
   onSnapshot(doc(db, "meta", "counters"), snap => {
     counters = snap.exists() ? snap.data() : { curiousCount: 0, interviewerCount: 0 };
-    if (activeTab === 1) renderTab(1);
+    if (draftState.activeTab === 1) renderTab(1);
   });
 
   onSnapshot(collection(db, "customCourses"), snap => {
@@ -167,19 +235,20 @@ function renderCourseLists() {
   for (const c of filtered) {
     left.appendChild(courseRow(c, () => toggleCourse(c.code)));
   }
-  for (const code of [...selectedCourses].sort()) {
+  for (const code of [...draftState.selectedCourses].sort()) {
     const c = COURSES.find(x => x.code === code);
     if (c) right.appendChild(courseRow(c, () => toggleCourse(c.code)));
   }
 
-  const allSelected = COURSES.length > 0 && COURSES.every(c => selectedCourses.has(c.code));
+  const allSelected = COURSES.length > 0 && COURSES.every(c => draftState.selectedCourses.has(c.code));
   document.getElementById("selectAllBtn").textContent = allSelected ? "Unselect all" : "Select all";
 }
 function courseRow(c, onToggle) {
   const li = document.createElement("li");
   const cb = document.createElement("input");
   cb.type = "checkbox";
-  cb.checked = selectedCourses.has(c.code);
+  cb.dataset.code = c.code;
+  cb.checked = draftState.selectedCourses.has(c.code);
   cb.addEventListener("change", onToggle);
   const label = document.createElement("span");
   label.innerHTML = `<span class="course-code">${c.code}</span> — ${c.name}`;
@@ -187,51 +256,51 @@ function courseRow(c, onToggle) {
   li.appendChild(label);
   return li;
 }
+// Ticking/unticking a course is navigation, not a content change — it's
+// never itself an undo step. But it can cascade into dropping an active
+// pick or observations tied to that course, and *that* is a real content
+// change: undoable, lock-respecting, and always explained.
+function toggleCourse(code) {
+  applyToDraft(state => {
+    if (state.selectedCourses.has(code)) state.selectedCourses.delete(code); else state.selectedCourses.add(code);
+  });
+  pruneToSelectedCourses();
+  refreshCourseScopedCounts();
+}
+function wireCoursePicker() {
+  document.getElementById("courseSearch").addEventListener("input", renderCourseLists);
+  document.getElementById("selectAllBtn").addEventListener("click", () => {
+    const allSelected = COURSES.length > 0 && COURSES.every(c => draftState.selectedCourses.has(c.code));
+    applyToDraft(state => { state.selectedCourses = allSelected ? new Set() : new Set(COURSES.map(c => c.code)); });
+    pruneToSelectedCourses();
+    refreshCourseScopedCounts();
+  });
+}
 // Unticking a course used to silently wipe any active-role pick or
 // observations tied to it — no feedback, and no check of the same
 // already-has-observers lock that blocks every other way of changing
 // the active role. Now it respects the lock (re-ticking the course
 // rather than dropping a locked pick) and always tells the student
 // what happened.
-function pruneDraftToSelectedCourses() {
-  const activeCourseGone = draftActive && !selectedCourses.has(draftActive.course);
-  if (activeCourseGone && activeLocked) selectedCourses.add(draftActive.course);
-  const droppingActive = activeCourseGone && !activeLocked;
-  const keptObservations = draftObservations.filter(o => selectedCourses.has(o.course));
-  const droppedObsCount = draftObservations.length - keptObservations.length;
-
-  if (droppingActive || droppedObsCount > 0) pushHistory();
-  if (droppingActive) draftActive = null;
-  draftObservations = keptObservations;
-  if (droppingActive || droppedObsCount > 0) updateUndoButtons();
-
+function pruneToSelectedCourses() {
+  const activeCourseGone = draftState.active && !draftState.selectedCourses.has(draftState.active.course);
   if (activeCourseGone && activeLocked) {
+    applyToDraft(state => { state.selectedCourses.add(state.active.course); });
     showActiveLockedDialog();
-  } else {
-    const parts = [];
-    if (droppingActive) parts.push("your active-role selection");
-    if (droppedObsCount === 1) parts.push("an observation");
-    else if (droppedObsCount > 1) parts.push(`${droppedObsCount} observations`);
-    if (parts.length) toast(`Removed ${parts.join(" and ")} — you unticked its course.`);
+    return;
   }
-}
-function toggleCourse(code) {
-  if (selectedCourses.has(code)) selectedCourses.delete(code); else selectedCourses.add(code);
-  pruneDraftToSelectedCourses();
-  renderCourseLists();
-  refreshCourseScopedCounts();
-  if (nameConfirmed) { renderTab(activeTab); renderSummary(); }
-}
-function wireCoursePicker() {
-  document.getElementById("courseSearch").addEventListener("input", renderCourseLists);
-  document.getElementById("selectAllBtn").addEventListener("click", () => {
-    const allSelected = COURSES.length > 0 && COURSES.every(c => selectedCourses.has(c.code));
-    selectedCourses = allSelected ? new Set() : new Set(COURSES.map(c => c.code));
-    pruneDraftToSelectedCourses();
-    renderCourseLists();
-    refreshCourseScopedCounts();
-    if (nameConfirmed) { renderTab(activeTab); renderSummary(); }
+  const droppedObs = draftState.observations.filter(o => !draftState.selectedCourses.has(o.course));
+  if (!activeCourseGone && !droppedObs.length) return;
+
+  setState(state => {
+    if (activeCourseGone) state.active = null;
+    state.observations = state.observations.filter(o => state.selectedCourses.has(o.course));
   });
+  const parts = [];
+  if (activeCourseGone) parts.push("your active-role selection");
+  if (droppedObs.length === 1) parts.push("an observation");
+  else if (droppedObs.length > 1) parts.push(`${droppedObs.length} observations`);
+  toast(`Removed ${parts.join(" and ")} — you unticked its course.`);
 }
 
 // Live counts of curious/interviewer registrations, scoped to only the
@@ -240,11 +309,11 @@ function wireCoursePicker() {
 // to this student rather than the whole class (that's what the global
 // `counters` / tab-1 balance rule are for).
 async function refreshCourseScopedCounts() {
-  if (selectedCourses.size === 0) {
+  if (draftState.selectedCourses.size === 0) {
     courseScopedCounts = { curious: 0, interviewer: 0 };
   } else {
     try {
-      const courses = [...selectedCourses].slice(0, 30); // Firestore 'in' query cap
+      const courses = [...draftState.selectedCourses].slice(0, 30); // Firestore 'in' query cap
       const snap = await getDocs(query(collection(db, "sessions"), where("course", "in", courses)));
       let curious = 0, interviewer = 0;
       snap.forEach(d => { const data = d.data(); if (data.curious) curious++; if (data.interviewer) interviewer++; });
@@ -253,11 +322,13 @@ async function refreshCourseScopedCounts() {
       console.error(err);
     }
   }
-  if (nameConfirmed && [2, 3, 4].includes(activeTab)) renderTab(activeTab);
+  renderApp();
 }
-wireCoursePicker();
 
 /* ---------------- add-course modal ---------------- */
+// This modal composes a submission to the shared course catalog, not the
+// student's own state — its scratch fields (which week it's browsing,
+// which slots are pending) are deliberately local, not part of draftState.
 let addCourseWeek = FIRST_MONDAY;
 let pendingInstances = []; // {date, slot, type}
 
@@ -375,7 +446,7 @@ async function submitAddCourse() {
     await Promise.all(pendingInstances.map(p =>
       setDoc(doc(db, "customSchedule", `${code}_${p.date}_${p.slot}`), { course: code, date: p.date, slot: p.slot, type: p.type })
     ));
-    selectedCourses.add(code);
+    applyToDraft(state => { state.selectedCourses.add(code); });
     refreshCourseScopedCounts();
     closeAddCourseModal();
     toast(existing
@@ -468,18 +539,17 @@ function cancelToNameInput() {
   input.focus();
   input.select();
 }
-async function confirmFreshStart() {
+// --- Loader: the only two places a Firestore student doc becomes this
+// app's in-memory state. ---
+function confirmFreshStart() {
   nameConfirmed = true;
   origState = { active: null, observations: [], createdAt: null };
-  draftActive = null;
-  draftObservations = [];
+  draftState = makeEmptyDraftState();
   historyStack = [];
   document.getElementById("mainApp").classList.remove("hidden");
   document.getElementById("lockedNotice").classList.add("hidden");
   activeLocked = false;
-  renderSummary();
-  renderTab(activeTab);
-  updateUndoButtons();
+  renderApp();
 }
 async function confirmReturning(existingData) {
   hideBanners();
@@ -490,28 +560,12 @@ async function confirmReturning(existingData) {
     observations: existingData.observations || [],
     createdAt: existingData.createdAt || null
   };
-  draftActive = origState.active;
-  draftObservations = [...origState.observations];
+  draftState = loadDraftFromSaved(origState);
   historyStack = [];
-  // The role radio defaults to "curious" in the markup and nothing else
-  // ever synced it to a returning student's actual saved role — so an
-  // Interviewer logging back in saw the radio (and the box highlight,
-  // which reads off the checked radio) silently showing the wrong role.
-  if (origState.active) {
-    const radio = document.querySelector(`input[name="tab1role"][value="${origState.active.role}"]`);
-    if (radio) radio.checked = true;
-  }
-  selectedCourses = new Set([
-    ...(origState.active ? [origState.active.course] : []),
-    ...origState.observations.map(o => o.course)
-  ]);
-  renderCourseLists();
   refreshCourseScopedCounts();
   await refreshActiveLock();
   document.getElementById("mainApp").classList.remove("hidden");
-  renderSummary();
-  renderTab(activeTab);
-  updateUndoButtons();
+  renderApp();
 }
 async function refreshActiveLock() {
   activeLocked = false;
@@ -537,17 +591,17 @@ function wireTabs() {
     btn.addEventListener("click", () => switchTab(Number(btn.dataset.tab)));
   });
   document.querySelectorAll('input[name="tab1role"]').forEach(r => r.addEventListener("change", () => onTab1RoleChange(r)));
-  document.querySelectorAll('input[name="tab4role"]').forEach(r => r.addEventListener("change", () => renderTab(4)));
+  document.querySelectorAll('input[name="tab4role"]').forEach(r => r.addEventListener("change", () => {
+    applyToDraft(state => { state.tab4Role = r.value; });
+  }));
 }
 function switchTab(n) {
-  activeTab = n;
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", Number(b.dataset.tab) === n));
   document.querySelectorAll(".tab-content").forEach(el => el.classList.toggle("hidden", el.id !== `tab${n}`));
-  renderTab(n);
-  // These two are one-off fetches, not live — refreshing on every tab
-  // switch (cheap: one query, one doc read) keeps them from silently
-  // going stale if another student approved something while you sat on
-  // a different tab, without needing a permanent extra listener.
+  applyToDraft(state => { state.activeTab = n; });
+  // One-off fetches, not live — refreshing on every tab switch (cheap:
+  // one query, one doc read) keeps them from silently going stale if
+  // another student approved something while you sat on a different tab.
   if ([2, 3, 4].includes(n)) refreshCourseScopedCounts();
   if (n === 1) refreshActiveLock();
 }
@@ -557,7 +611,7 @@ function switchTab(n) {
 // callback's own renderTab() call would tear down and recreate the
 // listener on every update, looping forever against Firestore.
 function ensureWeekListener(tabNum) {
-  const monday = weekState[tabNum];
+  const monday = draftState.weekByTab[tabNum];
   if (subscribedWeekByTab[tabNum] === monday && unsubByTab[tabNum]) return;
   if (unsubByTab[tabNum]) unsubByTab[tabNum]();
   subscribedWeekByTab[tabNum] = monday;
@@ -566,7 +620,7 @@ function ensureWeekListener(tabNum) {
     const m = new Map();
     snap.forEach(d => m.set(d.id, d.data()));
     weekSessionsByTab[tabNum] = m;
-    if (activeTab === tabNum) renderTab(tabNum);
+    if (draftState.activeTab === tabNum) renderTab(tabNum);
   });
 }
 
@@ -589,6 +643,8 @@ function renderTab1() {
   const notice = document.getElementById("tab1Balance");
   const curiousRadio = document.querySelector('input[name="tab1role"][value="curious"]');
   const interviewerRadio = document.querySelector('input[name="tab1role"][value="interviewer"]');
+  curiousRadio.checked = draftState.tab1Role === "curious";
+  interviewerRadio.checked = draftState.tab1Role === "interviewer";
   curiousRadio.disabled = false;
   interviewerRadio.disabled = false;
   notice.classList.add("hidden");
@@ -596,13 +652,19 @@ function renderTab1() {
   const c = counters.curiousCount, i = counters.interviewerCount;
   if (diff > BALANCE_THRESHOLD) {
     curiousRadio.disabled = true;
-    if (curiousRadio.checked) { curiousRadio.checked = false; interviewerRadio.checked = true; }
+    if (draftState.tab1Role === "curious") {
+      draftState.tab1Role = "interviewer";
+      curiousRadio.checked = false; interviewerRadio.checked = true;
+    }
     notice.textContent = `Currently there is a strong imbalance toward Curious Student in the class (${c} Curious Students vs. ${i} Interviewers). You may only select Interviewer for now — or wait a little and check back once the balance improves.`;
     notice.className = "notice info";
     notice.classList.remove("hidden");
   } else if (-diff > BALANCE_THRESHOLD) {
     interviewerRadio.disabled = true;
-    if (interviewerRadio.checked) { interviewerRadio.checked = false; curiousRadio.checked = true; }
+    if (draftState.tab1Role === "interviewer") {
+      draftState.tab1Role = "curious";
+      interviewerRadio.checked = false; curiousRadio.checked = true;
+    }
     notice.textContent = `Currently there is a strong imbalance toward Interviewer in the class (${i} Interviewers vs. ${c} Curious Students). You may only select Curious Student for now — or wait a little and check back once the balance improves.`;
     notice.className = "notice info";
     notice.classList.remove("hidden");
@@ -620,8 +682,11 @@ function renderTab2or3(tabNum, targetRole) {
   }
 }
 function renderTab4() {
-  const role = document.querySelector('input[name="tab4role"]:checked').value;
-  renderTab2or3(4, role);
+  const curiousRadio = document.querySelector('input[name="tab4role"][value="curious"]');
+  const interviewerRadio = document.querySelector('input[name="tab4role"][value="interviewer"]');
+  curiousRadio.checked = draftState.tab4Role === "curious";
+  interviewerRadio.checked = draftState.tab4Role === "interviewer";
+  renderTab2or3(4, draftState.tab4Role);
 }
 
 /* ---------------- box computation ---------------- */
@@ -631,13 +696,13 @@ function layoutDims(count) {
   return { rows: Math.ceil(count / 2), cols: 2 };
 }
 function computeBoxesForDate(tabNum, date, slot) {
-  const entries = (scheduleByDateSlot.get(`${date}_${slot}`) || []).filter(e => selectedCourses.has(e.course));
+  const entries = (scheduleByDateSlot.get(`${date}_${slot}`) || []).filter(e => draftState.selectedCourses.has(e.course));
   const boxes = [];
   for (const e of entries) {
     const key = `${e.course}_${date}_${slot}`;
     const session = getSession(tabNum, key);
     if (tabNum === 1) {
-      const role = document.querySelector('input[name="tab1role"]:checked').value;
+      const role = draftState.tab1Role;
       const oppositeRole = role === "curious" ? "interviewer" : "curious";
       const mineOccupant = session[role] && occupantSlug(session[role]) === currentSlug;
       const occupiedBySame = session[role] && !mineOccupant;
@@ -649,18 +714,18 @@ function computeBoxesForDate(tabNum, date, slot) {
       } else if (occupiedByOpposite) { tier = "tier-green-orange"; clickable = true; }
       else { tier = "tier-green"; clickable = true; }
       boxes.push({
-        course: e.course, type: e.type, tier, clickable, explain,
-        selected: !!(draftActive && keyOf(draftActive) === key && draftActive.role === role),
+        course: e.course, type: e.type, tier, clickable, explain, date, slot, role,
+        selected: !!(draftState.active && keyOf(draftState.active) === key && draftState.active.role === role),
         badge: null,
         onClick: clickable ? () => onTab1Click(e.course, date, slot, role) : null
       });
     } else {
-      const targetRole = tabNum === 2 ? "curious" : tabNum === 3 ? "interviewer" : document.querySelector('input[name="tab4role"]:checked').value;
+      const targetRole = tabNum === 2 ? "curious" : tabNum === 3 ? "interviewer" : draftState.tab4Role;
       const occupant = session[targetRole];
       if (!occupant) continue;
       const observers = session[targetRole + "Observers"] || [];
       const count = observers.length;
-      const alreadyMine = draftObservations.some(o => keyOf(o) === key && o.targetRole === targetRole);
+      const alreadyMine = draftState.observations.some(o => keyOf(o) === key && o.targetRole === targetRole);
       let tier, clickable, explain = null;
       if (count >= MAX_OBSERVERS) {
         tier = "tier-red"; clickable = false;
@@ -669,7 +734,7 @@ function computeBoxesForDate(tabNum, date, slot) {
       else if (count === 1) { tier = "tier-green-orange"; clickable = true; }
       else { tier = "tier-green"; clickable = true; }
       boxes.push({
-        course: e.course, type: e.type, tier, clickable, explain,
+        course: e.course, type: e.type, tier, clickable, explain, date, slot, role: targetRole,
         selected: alreadyMine,
         badge: count >= MAX_OBSERVERS ? `≥${MAX_OBSERVERS}` : String(count),
         onClick: clickable ? () => onObserverClick(tabNum, e.course, date, slot, targetRole, occupant, count) : null
@@ -693,6 +758,10 @@ function fontSizesFor(rows) {
 function renderBox(b, dims) {
   const div = document.createElement("div");
   div.className = `box ${b.tier}` + (b.clickable ? " clickable" : "") + (b.selected ? " selected" : "") + (!b.clickable && b.explain ? " explainable" : "");
+  div.dataset.course = b.course;
+  div.dataset.date = b.date;
+  div.dataset.slot = b.slot;
+  div.dataset.role = b.role;
   const fs = fontSizesFor(dims.rows || 1);
   div.innerHTML = `<span class="code" style="font-size:${fs.code}px">${b.course}</span><span class="type" style="font-size:${fs.type}px">${b.type}</span>` +
     (b.badge != null ? `<span class="badge" style="font-size:${fs.badge}px">${b.badge}</span>` : "");
@@ -708,7 +777,7 @@ function renderBox(b, dims) {
 function renderCalendarShell(tabNum) {
   const container = document.querySelector(`.calendar[data-tab="${tabNum}"]`);
   container.innerHTML = "";
-  const monday = weekState[tabNum];
+  const monday = draftState.weekByTab[tabNum];
 
   const weekNum = isoWeek(monday);
   const note = WEEK_NOTES[weekNum];
@@ -720,8 +789,8 @@ function renderCalendarShell(tabNum) {
   const wn = document.createElement("span"); wn.className = "week-num" + (note ? ` ${note.cls}` : ""); wn.textContent = `Week ${weekNum}`;
   prevBtn.disabled = monday <= FIRST_MONDAY;
   nextBtn.disabled = monday >= LAST_MONDAY;
-  prevBtn.addEventListener("click", () => { weekState[tabNum] = addDays(weekState[tabNum], -7); ensureWeekListener(tabNum); renderCalendarShell(tabNum); });
-  nextBtn.addEventListener("click", () => { weekState[tabNum] = addDays(weekState[tabNum], 7); ensureWeekListener(tabNum); renderCalendarShell(tabNum); });
+  prevBtn.addEventListener("click", () => applyToDraft(state => { state.weekByTab[tabNum] = addDays(state.weekByTab[tabNum], -7); }));
+  nextBtn.addEventListener("click", () => applyToDraft(state => { state.weekByTab[tabNum] = addDays(state.weekByTab[tabNum], 7); }));
   nav.append(prevBtn, wn, nextBtn);
   container.appendChild(nav);
   if (note) {
@@ -765,59 +834,54 @@ function renderCalendarShell(tabNum) {
 function onTab1Click(course, date, slot, role) {
   if (activeLocked) { showActiveLockedDialog(); return; }
   const key = `${course}_${date}_${slot}`;
-  if (draftActive && keyOf(draftActive) === key && draftActive.role === role) return;
-  pushHistory();
-  draftActive = { course, date, slot, role };
-  renderTab(1);
-  renderSummary();
-  updateUndoButtons();
+  if (draftState.active && keyOf(draftState.active) === key && draftState.active.role === role) return;
+  setState(state => { state.active = { course, date, slot, role }; });
 }
 function showActiveLockedDialog() {
   showConfirmDialog({ text: document.getElementById("lockedNotice").innerHTML, buttons: [{ label: "OK", action: () => {} }] });
 }
 // Flipping the Curious/Interviewer radio while a session is already
-// selected used to just re-render the calendar for the new role — the
-// box highlight vanished (nothing matched the new role) but draftActive
-// itself never changed, so the summary panel silently kept showing the
-// old role. Now a flip is a real action: try to swap the currently
-// selected session to the new role, and either carry it through
-// everywhere (box, summary) or revert the radio and explain why not.
+// selected tries to swap that session to the new role: succeeds (box
+// stays highlighted, summary updates) if that role's open there, or
+// reverts the radio and explains why if not. With no session selected
+// yet, flipping the radio is pure browsing — no lock, no swap, just
+// changes which role's boxes you're looking at.
 async function onTab1RoleChange(radioEl) {
   const newRole = radioEl.value;
-  if (!draftActive || draftActive.role === newRole) { renderTab(1); return; }
-  const revertRadio = () => {
-    document.querySelector(`input[name="tab1role"][value="${draftActive.role}"]`).checked = true;
-  };
+  const prevRole = draftState.tab1Role;
+  if (newRole === prevRole) return;
+  const revert = () => { document.querySelector(`input[name="tab1role"][value="${prevRole}"]`).checked = true; };
+
+  if (!draftState.active) {
+    applyToDraft(state => { state.tab1Role = newRole; });
+    return;
+  }
   if (activeLocked) {
-    revertRadio();
+    revert();
     showActiveLockedDialog();
     return;
   }
-  const key = keyOf(draftActive);
+  const key = keyOf(draftState.active);
   let session;
   try {
     const snap = await getDoc(doc(db, "sessions", key));
     session = snap.exists() ? snap.data() : emptySession(key);
   } catch (err) {
     console.error(err);
-    revertRadio();
+    revert();
     toast("Couldn't check that slot right now — please try again.");
     return;
   }
   const occupant = session[newRole];
   if (occupant && occupantSlug(occupant) !== currentSlug) {
-    revertRadio();
+    revert();
     showConfirmDialog({
-      text: `Can't switch to ${newRole === "curious" ? "Curious Student" : "Interviewer"} for your selected session (${draftActive.course}) — that role there is already taken. Pick a different session for ${newRole === "curious" ? "Curious Student" : "Interviewer"} instead, or keep your current selection.`,
+      text: `Can't switch to ${newRole === "curious" ? "Curious Student" : "Interviewer"} for your selected session (${draftState.active.course}) — that role there is already taken. Pick a different session for ${newRole === "curious" ? "Curious Student" : "Interviewer"} instead, or keep your current selection.`,
       buttons: [{ label: "OK", action: () => {} }]
     });
     return;
   }
-  pushHistory();
-  draftActive = { ...draftActive, role: newRole };
-  renderTab(1);
-  renderSummary();
-  updateUndoButtons();
+  setState(state => { state.active = { ...state.active, role: newRole }; state.tab1Role = newRole; });
 }
 function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count) {
   if (occupantSlug(occupant) === currentSlug) {
@@ -825,13 +889,9 @@ function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count
     return;
   }
   const key = `${course}_${date}_${slot}`;
-  const idx = draftObservations.findIndex(o => keyOf(o) === key && o.targetRole === targetRole);
+  const idx = draftState.observations.findIndex(o => keyOf(o) === key && o.targetRole === targetRole);
   if (idx >= 0) {
-    pushHistory();
-    draftObservations.splice(idx, 1);
-    renderTab(tabNum);
-    renderSummary();
-    updateUndoButtons();
+    setState(state => { state.observations.splice(idx, 1); });
     return;
   }
   if (count === 2) {
@@ -840,21 +900,13 @@ function onObserverClick(tabNum, course, date, slot, targetRole, occupant, count
       buttons: [
         { label: "I understand", action: () => {} },
         { label: "I don't have other options — select anyway", action: () => {
-          pushHistory();
-          draftObservations.push({ course, date, slot, targetRole, targetName: occupant.name });
-          renderTab(tabNum);
-          renderSummary();
-          updateUndoButtons();
+          setState(state => { state.observations.push({ course, date, slot, targetRole, targetName: occupant.name }); });
         } }
       ]
     });
     return;
   }
-  pushHistory();
-  draftObservations.push({ course, date, slot, targetRole, targetName: occupant.name });
-  renderTab(tabNum);
-  renderSummary();
-  updateUndoButtons();
+  setState(state => { state.observations.push({ course, date, slot, targetRole, targetName: occupant.name }); });
 }
 
 /* ---------------- summary ---------------- */
@@ -876,13 +928,13 @@ function entryBlock(roleLabel, course, date, slot) {
 function renderSummary() {
   const activeEl = document.getElementById("summaryActive");
   const obsEl = document.getElementById("summaryObservations");
-  activeEl.innerHTML = "<strong>Active role</strong><br>" + (draftActive
-    ? entryBlock(draftActive.role === "curious" ? "Curious Student" : "Interviewer", draftActive.course, draftActive.date, draftActive.slot)
+  activeEl.innerHTML = "<strong>Active role</strong><br>" + (draftState.active
+    ? entryBlock(draftState.active.role === "curious" ? "Curious Student" : "Interviewer", draftState.active.course, draftState.active.date, draftState.active.slot)
     : `<div class="entry">No active-role session selected yet.</div>`);
   obsEl.innerHTML = "<strong>Observer roles</strong><br>"
     + `<p class="hint">You don't have to add these now — you can come back later and enter the same name to add them.</p>`
-    + (draftObservations.length
-      ? draftObservations.map(o => entryBlock(`Observing: ${o.targetName} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}")`, o.course, o.date, o.slot)).join("")
+    + (draftState.observations.length
+      ? draftState.observations.map(o => entryBlock(`Observing: ${o.targetName} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}")`, o.course, o.date, o.slot)).join("")
       : `<div class="entry">No observer roles selected yet.</div>`);
 }
 function flashSummary() {
@@ -894,40 +946,31 @@ function flashSummary() {
 }
 
 /* ---------------- undo ---------------- */
-function snapshotDraft() {
-  return { draftActive: draftActive ? { ...draftActive } : null, draftObservations: draftObservations.map(o => ({ ...o })) };
-}
-function pushHistory() {
-  historyStack.push(snapshotDraft());
-  if (historyStack.length > 20) historyStack.shift();
-  updateUndoButtons();
-}
 function updateUndoButtons() {
   const undoEnabled = nameConfirmed && historyStack.length > 0;
   document.getElementById("undoLastBtn").disabled = !undoEnabled;
   document.getElementById("undoAllBtn").disabled = !undoEnabled;
-  const eraseEnabled = nameConfirmed && (!!draftActive || draftObservations.length > 0);
+  const eraseEnabled = nameConfirmed && (!!draftState.active || draftState.observations.length > 0);
   document.getElementById("eraseAllBtn").disabled = !eraseEnabled;
 }
+// Undo last/all consume history themselves rather than creating a new
+// entry, so they go through applyToDraft (render, no push) — pushing
+// here would make "undo" itself undo-able into a loop.
 function undoLast() {
   if (!historyStack.length) return;
   const prev = historyStack.pop();
-  draftActive = prev.draftActive;
-  draftObservations = prev.draftObservations;
-  renderTab(activeTab);
-  renderSummary();
+  applyToDraft(state => { state.active = prev.active; state.observations = prev.observations; });
   flashSummary();
-  updateUndoButtons();
 }
 function undoAll() {
   if (!historyStack.length) return;
-  draftActive = origState.active ? { ...origState.active } : null;
-  draftObservations = origState.observations.map(o => ({ ...o }));
   historyStack = [];
-  renderTab(activeTab);
-  renderSummary();
+  applyToDraft(state => {
+    state.active = origState.active ? { ...origState.active } : null;
+    state.observations = origState.observations.map(o => ({ ...o }));
+    if (state.active) state.tab1Role = state.active.role;
+  });
   flashSummary();
-  updateUndoButtons();
 }
 // Distinct from "Undo all": that restores the last-approved state (or
 // blank, for a first-time student). This wipes the draft to nothing
@@ -937,14 +980,12 @@ function undoAll() {
 // everywhere else that respects that lock.
 function eraseAllSelections() {
   if (!nameConfirmed) return;
-  if (!draftActive && !draftObservations.length) return;
-  pushHistory();
-  draftActive = activeLocked ? draftActive : null;
-  draftObservations = [];
-  renderTab(activeTab);
-  renderSummary();
+  if (!draftState.active && !draftState.observations.length) return;
+  setState(state => {
+    state.active = activeLocked ? state.active : null;
+    state.observations = [];
+  });
   flashSummary();
-  updateUndoButtons();
   if (activeLocked) toast("Your active role already has observers and can't be cleared here — everything else was erased.");
 }
 function wireUndo() {
@@ -1033,15 +1074,22 @@ async function onApprove() {
     showConfirmDialog({ text, buttons: [{ label: "OK", action: () => {} }] });
   }
 }
+// --- Saver: the only place this app's draftState becomes a Firestore
+// write. Reads/writes exactly the persisted slice (active, observations)
+// of the unified state — selectedCourses/activeTab/weekByTab/tab roles
+// never leave the browser. ---
 async function approveSelections() {
   const slug = currentSlug;
   const nameSnapshot = currentName;
+  const newActive = draftState.active;
+  const newObservations = draftState.observations;
+
   await runTransaction(db, async (tx) => {
     const touchedKeys = new Set();
     if (origState.active) touchedKeys.add(keyOf(origState.active));
-    if (draftActive) touchedKeys.add(keyOf(draftActive));
+    if (newActive) touchedKeys.add(keyOf(newActive));
     origState.observations.forEach(o => touchedKeys.add(keyOf(o)));
-    draftObservations.forEach(o => touchedKeys.add(keyOf(o)));
+    newObservations.forEach(o => touchedKeys.add(keyOf(o)));
 
     const sessionRefs = {}; const sessionData = {};
     for (const k of touchedKeys) {
@@ -1059,28 +1107,28 @@ async function approveSelections() {
       const s = sessionData[k];
       if (s[origState.active.role] && occupantSlug(s[origState.active.role]) === slug) s[origState.active.role] = null;
     }
-    if (draftActive) {
-      const k = keyOf(draftActive);
+    if (newActive) {
+      const k = keyOf(newActive);
       const s = sessionData[k];
-      if (s[draftActive.role] && occupantSlug(s[draftActive.role]) !== slug) throw new Error("CONFLICT_ACTIVE");
-      s[draftActive.role] = { name: nameSnapshot, uid: myUid, slug };
+      if (s[newActive.role] && occupantSlug(s[newActive.role]) !== slug) throw new Error("CONFLICT_ACTIVE");
+      s[newActive.role] = { name: nameSnapshot, uid: myUid, slug };
     }
     const origRole = origState.active ? origState.active.role : null;
-    const draftRole = draftActive ? draftActive.role : null;
+    const draftRole = newActive ? newActive.role : null;
     if (origRole !== draftRole) {
       if (origRole) cnt[origRole + "Count"] = Math.max(0, (cnt[origRole + "Count"] || 0) - 1);
       if (draftRole) cnt[draftRole + "Count"] = (cnt[draftRole + "Count"] || 0) + 1;
     }
 
     for (const o of origState.observations) {
-      const stillThere = draftObservations.some(d => keyOf(d) === keyOf(o) && d.targetRole === o.targetRole);
+      const stillThere = newObservations.some(d => keyOf(d) === keyOf(o) && d.targetRole === o.targetRole);
       if (!stillThere) {
         const k = keyOf(o); const s = sessionData[k];
         const arr = s[o.targetRole + "Observers"] || [];
         s[o.targetRole + "Observers"] = arr.filter(x => occupantSlug(x) !== slug);
       }
     }
-    for (const o of draftObservations) {
+    for (const o of newObservations) {
       const wasThere = origState.observations.some(x => keyOf(x) === keyOf(o) && x.targetRole === o.targetRole);
       if (!wasThere) {
         const k = keyOf(o); const s = sessionData[k];
@@ -1096,12 +1144,12 @@ async function approveSelections() {
     tx.set(counterRef, cnt);
     tx.set(doc(db, "students", slug), {
       name: nameSnapshot, nameLower: nameSnapshot.toLowerCase(), ownerUid: myUid,
-      active: draftActive, observations: draftObservations,
+      active: newActive, observations: newObservations,
       createdAt: origState.createdAt || serverTimestamp(), updatedAt: serverTimestamp()
     });
   });
 
-  origState = { active: draftActive, observations: [...draftObservations], createdAt: origState.createdAt || new Date() };
+  origState = { active: newActive, observations: [...newObservations], createdAt: origState.createdAt || new Date() };
   historyStack = [];
   updateUndoButtons();
   await refreshActiveLock();
@@ -1112,17 +1160,17 @@ async function approveSelections() {
 function buildSummaryText() {
   const lines = [`VågaFråga registration for ${currentName}`, ""];
   lines.push("Active role:");
-  lines.push(draftActive ? `  ${draftActive.role === "curious" ? "Curious Student" : "Interviewer"} — ${fmtEntry(draftActive.course, draftActive.date, draftActive.slot)}` : "  (none)");
+  lines.push(draftState.active ? `  ${draftState.active.role === "curious" ? "Curious Student" : "Interviewer"} — ${fmtEntry(draftState.active.course, draftState.active.date, draftState.active.slot)}` : "  (none)");
   lines.push("");
   lines.push("Observer roles:");
-  if (draftObservations.length) draftObservations.forEach(o => lines.push(`  Observing: ${o.targetName} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}") — ${fmtEntry(o.course, o.date, o.slot)}`));
+  if (draftState.observations.length) draftState.observations.forEach(o => lines.push(`  Observing: ${o.targetName} (whose role is "${o.targetRole === "curious" ? "Curious Student" : "Interviewer"}") — ${fmtEntry(o.course, o.date, o.slot)}`));
   else lines.push("  (none)");
   return lines.join("\n");
 }
 function collectEvents() {
   const events = [];
-  if (draftActive) events.push(draftActive);
-  draftObservations.forEach(o => events.push(o));
+  if (draftState.active) events.push(draftState.active);
+  draftState.observations.forEach(o => events.push(o));
   return events;
 }
 function eventTitle(e) {
