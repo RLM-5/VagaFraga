@@ -214,12 +214,26 @@ async function boot() {
   document.getElementById("nameInput").placeholder =
     `e.g. ${PLACEHOLDER_NAMES[Math.floor(Math.random() * PLACEHOLDER_NAMES.length)]}`;
 
-  const [c, s] = await Promise.all([
-    fetch("data/courses.json").then(r => r.json()),
-    fetch("data/schedule.json").then(r => r.json())
-  ]);
-  STATIC_COURSES = c;
-  STATIC_SCHEDULE = s;
+  // Nothing below this point is wired up yet (no listener on the name
+  // field, nothing), so a failure here has to be visible on its own —
+  // it can't rely on any function boot() hasn't reached yet, and there's
+  // no toast to fade past unnoticed: the page would otherwise just sit
+  // there looking normal but doing nothing for every input.
+  try {
+    const [c, s] = await Promise.all([
+      fetch("data/courses.json").then(r => r.json()),
+      fetch("data/schedule.json").then(r => r.json())
+    ]);
+    STATIC_COURSES = c;
+    STATIC_SCHEDULE = s;
+  } catch (err) {
+    console.error(err);
+    const banner = document.getElementById("loadErrorBanner");
+    banner.classList.remove("hidden");
+    banner.innerHTML = `Couldn't load the course data — please check your connection. <button id="retryBootBtn" type="button">Retry</button>`;
+    document.getElementById("retryBootBtn").addEventListener("click", () => location.reload());
+    return;
+  }
   rebuildMergedData();
 
   wireHeader();
@@ -520,7 +534,16 @@ async function handleNameStabilized(name) {
   // visibly there and still resolves to nothing (only punctuation/symbols)
   // would otherwise look like the app just isn't responding.
   if (!slug) { toast("Please include at least one letter or number in your name."); return; }
-  const snap = await getDoc(doc(db, "students", slug));
+  let snap;
+  try {
+    snap = await getDoc(doc(db, "students", slug));
+  } catch (err) {
+    // Without this, a dropped connection right here left the student
+    // staring at a name field that silently never did anything next.
+    console.error(err);
+    toast("Couldn't reach the server to check that name — please check your connection and try again.");
+    return;
+  }
   currentName = trimmed;
   currentSlug = slug;
   if (snap.exists()) {
@@ -614,7 +637,20 @@ async function refreshActiveLock() {
   const notice = document.getElementById("lockedNotice");
   notice.classList.add("hidden");
   if (!origState.active) return;
-  const snap = await getDoc(doc(db, "sessions", keyOf(origState.active)));
+  let snap;
+  try {
+    snap = await getDoc(doc(db, "sessions", keyOf(origState.active)));
+  } catch (err) {
+    // This check gates a login flow (confirmReturning awaits it before
+    // ever unhiding mainApp) — a network hiccup here must not strand a
+    // returning student on a blank page. Fall through as "not locked":
+    // the lock is a courtesy against surprising someone's observers, not
+    // a data-integrity boundary (approveSelections never trusts it
+    // either), so under-protecting once during an outage is the far
+    // smaller cost than the app refusing to open at all.
+    console.error(err);
+    return;
+  }
   if (!snap.exists()) return;
   const data = snap.data();
   const observers = origState.active.role === "curious" ? data.curiousObservers : data.interviewerObservers;
