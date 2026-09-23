@@ -469,6 +469,14 @@ async function confirmReturning(existingData) {
   draftActive = origState.active;
   draftObservations = [...origState.observations];
   historyStack = [];
+  // The role radio defaults to "curious" in the markup and nothing else
+  // ever synced it to a returning student's actual saved role — so an
+  // Interviewer logging back in saw the radio (and the box highlight,
+  // which reads off the checked radio) silently showing the wrong role.
+  if (origState.active) {
+    const radio = document.querySelector(`input[name="tab1role"][value="${origState.active.role}"]`);
+    if (radio) radio.checked = true;
+  }
   selectedCourses = new Set([
     ...(origState.active ? [origState.active.course] : []),
     ...origState.observations.map(o => o.course)
