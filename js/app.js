@@ -516,7 +516,10 @@ async function handleNameStabilized(name) {
   if (!trimmed) return;
   await authReady;
   const slug = slugify(trimmed);
-  if (!slug) return;
+  // A blank field staying blank needs no explanation, but text that's
+  // visibly there and still resolves to nothing (only punctuation/symbols)
+  // would otherwise look like the app just isn't responding.
+  if (!slug) { toast("Please include at least one letter or number in your name."); return; }
   const snap = await getDoc(doc(db, "students", slug));
   currentName = trimmed;
   currentSlug = slug;
