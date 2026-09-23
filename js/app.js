@@ -484,14 +484,19 @@ async function submitAddCourse() {
   if (!existing && !nameRaw) { toast("Please fill in the course name."); return; }
 
   const connected = await authReadyWithin(8000);
-  if (!connected) { toast("Couldn't reach the server — please check your connection and try again."); return; }
+  if (!connected) { toast(connectivityFailMessage("connect")); return; }
   try {
-    if (!existing) {
-      await setDoc(doc(db, "customCourses", code), { code, name: nameRaw, addedBy: currentName || "anonymous", createdAt: serverTimestamp() });
-    }
-    await Promise.all(pendingInstances.map(p =>
-      setDoc(doc(db, "customSchedule", `${code}_${p.date}_${p.slot}`), { course: code, date: p.date, slot: p.slot, type: p.type })
-    ));
+    // setDoc overwrites rather than appends, so re-running this whole
+    // sequence after a partial failure is harmless — safe to retry as one unit.
+    await withRetry(async () => {
+      if (!existing) {
+        await setDoc(doc(db, "customCourses", code), { code, name: nameRaw, addedBy: currentName || "anonymous", createdAt: serverTimestamp() });
+      }
+      await Promise.all(pendingInstances.map(p =>
+        setDoc(doc(db, "customSchedule", `${code}_${p.date}_${p.slot}`), { course: code, date: p.date, slot: p.slot, type: p.type })
+      ));
+    });
+    connectivitySucceeded();
     applyToDraft(state => { state.selectedCourses.add(code); });
     refreshCourseScopedCounts();
     closeAddCourseModal();
@@ -500,7 +505,7 @@ async function submitAddCourse() {
       : "Course added — don't forget to go to the tabs below and select your own role for it.");
   } catch (err) {
     console.error(err);
-    toast("Could not add the course. Please try again.");
+    toast(connectivityFailMessage("add the course"));
   }
 }
 
@@ -531,7 +536,7 @@ async function handleNameStabilized(name) {
   const trimmed = name.trim();
   if (!trimmed) return;
   const connected = await authReadyWithin(8000);
-  if (!connected) { toast("Couldn't reach the server — please check your connection and try again."); return; }
+  if (!connected) { toast(connectivityFailMessage("connect")); return; }
   const slug = slugify(trimmed);
   // A blank field staying blank needs no explanation, but text that's
   // visibly there and still resolves to nothing (only punctuation/symbols)
@@ -539,12 +544,13 @@ async function handleNameStabilized(name) {
   if (!slug) { toast("Please include at least one letter or number in your name."); return; }
   let snap;
   try {
-    snap = await getDoc(doc(db, "students", slug));
-  } catch (err) {
     // Without this, a dropped connection right here left the student
     // staring at a name field that silently never did anything next.
+    snap = await withRetry(() => getDoc(doc(db, "students", slug)));
+    connectivitySucceeded();
+  } catch (err) {
     console.error(err);
-    toast("Couldn't reach the server to check that name — please check your connection and try again.");
+    toast(connectivityFailMessage("check that name"));
     return;
   }
   currentName = trimmed;
@@ -642,7 +648,8 @@ async function refreshActiveLock() {
   if (!origState.active) return;
   let snap;
   try {
-    snap = await getDoc(doc(db, "sessions", keyOf(origState.active)));
+    snap = await withRetry(() => getDoc(doc(db, "sessions", keyOf(origState.active))));
+    connectivitySucceeded();
   } catch (err) {
     // This check gates a login flow (confirmReturning awaits it before
     // ever unhiding mainApp) — a network hiccup here must not strand a
@@ -650,8 +657,10 @@ async function refreshActiveLock() {
     // the lock is a courtesy against surprising someone's observers, not
     // a data-integrity boundary (approveSelections never trusts it
     // either), so under-protecting once during an outage is the far
-    // smaller cost than the app refusing to open at all.
+    // smaller cost than the app refusing to open at all. Still worth
+    // telling them, since silently under-protecting is easy to miss.
     console.error(err);
+    toast(connectivityFailMessage("check your active-role status"));
     return;
   }
   if (!snap.exists()) return;
@@ -944,12 +953,13 @@ async function onTab1RoleChange(radioEl) {
   const key = keyOf(draftState.active);
   let session;
   try {
-    const snap = await getDoc(doc(db, "sessions", key));
+    const snap = await withRetry(() => getDoc(doc(db, "sessions", key)));
     session = snap.exists() ? snap.data() : emptySession(key);
+    connectivitySucceeded();
   } catch (err) {
     console.error(err);
     revert();
-    toast("Couldn't check that slot right now — please try again.");
+    toast(connectivityFailMessage("check that slot"));
     return;
   }
   const occupant = session[newRole];
@@ -1139,6 +1149,30 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.add("hidden"), 3500);
 }
 
+/* ---------------- connectivity: retry, then notify ---------------- */
+// One attempt, then one retry after a short pause — catches a connection
+// that blips and comes back on its own within a couple seconds, so a
+// single dropped packet doesn't immediately alarm the student.
+async function withRetry(fn, delayMs = 1500) {
+  try {
+    return await fn();
+  } catch (err) {
+    await new Promise(r => setTimeout(r, delayMs));
+    return await fn();
+  }
+}
+// Tracks failures across every connectivity-dependent action below, not
+// per-action — a student who's had trouble checking their name and then
+// trouble picking a slot is having one bad-connection experience, not two.
+let connectivityFailStreak = 0;
+function connectivitySucceeded() { connectivityFailStreak = 0; }
+function connectivityFailMessage(action) {
+  connectivityFailStreak++;
+  return connectivityFailStreak >= 3
+    ? `Still couldn't ${action} — if this keeps happening, try again later or contact your instructor.`
+    : `Couldn't ${action} right now — please check your connection and try again.`;
+}
+
 /* ---------------- approve ---------------- */
 function wireApprove() {
   document.getElementById("approveBtn").addEventListener("click", onApprove);
@@ -1166,12 +1200,16 @@ async function onApprove() {
   if (!navigator.onLine) { toast("You appear to be offline — reconnect before approving."); return; }
   try {
     const { staleAtStart } = await approveSelections();
+    connectivitySucceeded();
     showApprovalConfirmation(staleAtStart);
   } catch (err) {
     let text;
+    // The two conflicts are real business outcomes, not connectivity
+    // trouble — retrying won't change them, so they don't touch the
+    // connectivity streak or its escalating message.
     if (err.message === "CONFLICT_ACTIVE") text = "Someone else just took that active-role slot while you were choosing. Nothing was saved — please review your selection and pick another slot.";
     else if (err.message === "CONFLICT_OBSERVER") text = "That session just reached its observer limit while you were choosing. Nothing was saved — please review your selection and pick another session to observe.";
-    else { console.error(err); text = "Something went wrong saving your selections — nothing was saved. Please try again."; }
+    else { console.error(err); text = `${connectivityFailMessage("save your selections")} Nothing was saved.`; }
     showConfirmDialog({ text, buttons: [{ label: "OK", action: () => {} }] });
   }
 }
